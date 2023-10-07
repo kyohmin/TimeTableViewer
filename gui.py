@@ -173,7 +173,6 @@ class DataHandler:
     def __init__(self):
         self.__schedules = LinkedList()
         self.__filesPathList = []
-        self.__folderPath = "/Users/khms/CODE/ALGO/dataset"
         self.__rangeList = []
 
         # To hand over the range number to DisplayHandler for intialization of Hash Table
@@ -232,14 +231,11 @@ class DataHandler:
     def getRangeList(self) -> list:
         return self.__rangeList
 
-    def __queryFiles(self):
-        if self.__folderPath != "":
-            try:
-                for file in os.listdir(self.__folderPath):
-                    if file.endswith(".csv"):
-                        self.__filesPathList.append(os.path.join(self.__folderPath, file))
-            except FileNotFoundError:
-                self.__filesPathList
+    def setFilesPathList(self, filesList):
+        self.__filesPathList = filesList
+
+    def getFilesPathList(self):
+        return self.__filesPathList
 
     def __dateInput(self, strVal):
         day, month, year = strVal.split("/")
@@ -536,23 +532,24 @@ class GUI(ttk.Window):
         self.mainPage.columnconfigure(4,weight=1)
 
         # Predefining title and button style
-        self.titleFont = ("Arial", 40, "bold")
+        titleFont = ("Arial", 40, "bold")
         self.myButtonStyle = ttk.Style()
         self.myButtonStyle.configure('my.TButton', font=("Arial", 20))
 
         # Specific Setting
-        self.mainPageLabel = ttk.Label(self.mainPage, text="Timetable Viewer", font = self.titleFont)
+        self.mainPageLabel = ttk.Label(self.mainPage, text="Timetable Viewer", font = titleFont)
         self.mainPageSeparator = ttk.Separator(self.mainPage, bootstyle="primary")
         self.startBtn = ttk.Button(self.mainPage, text="START", style="my.TButton", command=lambda:[self.showPage(self.loadPage)])
         self.exitBtn = ttk.Button(self.mainPage, text="EXIT", style="my.TButton", command=self.destroy)
 
-        # Show on screen       
+        # Show on screen
         self.mainPageLabel.grid(row = 0 , column=2, sticky = "s", pady=(0,30))
         self.mainPageSeparator.grid(row = 0, column=2, sticky= "swe", pady=(0,0), padx=200)
-        self.startBtn.grid(row = 1, column = 2, sticky = "nwe", pady=(60), ipady = 10, padx=100)
-        self.exitBtn.grid(row = 1, column = 2, sticky = "nwe", pady=(135,0), ipady=10, padx=100)
+        self.startBtn.grid(row = 1, column = 2, sticky = "nwe", pady=(60), ipady = 10, padx=150)
+        self.exitBtn.grid(row = 1, column = 2, sticky = "nwe", pady=(135,0), ipady=10, padx=150)
 
     def initLoadPage(self):
+        # Setting Page
         self.loadPage.grid(row=0, column=0, sticky="nswe")
         self.loadPage.rowconfigure(0,weight=4)
         self.loadPage.rowconfigure(1,weight=4)
@@ -561,21 +558,91 @@ class GUI(ttk.Window):
         self.loadPage.columnconfigure(1,weight=3)
         self.loadPage.columnconfigure(2,weight=1)
 
-        self.loadPageLabel = ttk.Label(self.loadPage, text="Locate the Folder with CSV files", anchor="center", font=("Arial", 26, "bold"),borderwidth=10, relief="solid")
-        self.loadPageLabel.grid(row=0,column=1, sticky="nwe", pady=(50,0))
-        self.openFolderButton = ttk.Button(self.loadPage, text="Open Folder", style="my.TButton", command=lambda:[self.queryFolderDirectory()])
-        self.openFolderButton.grid(row=0,column=1, sticky="n", pady=(120,0), ipady=5, ipadx=40)
-        self.backButton = ttk.Button(self.loadPage, text="back", style="my.TButton", command=lambda:[self.changeFrame(self.mainPage)])
-        self.backButton.grid(row=2,column=0, sticky="s", pady=(0,20), padx=20, ipadx=30, ipady=7)
-        self.nextButton = ttk.Button(self.loadPage, text="next", style="my.TButton", command=lambda:[self.openViewPage()])
-        self.nextButton.grid(row=2,column=2, sticky="s", pady=(0,20), padx=20, ipadx=30, ipady=5)
-        self.listBox = tk.Listbox(self.loadPage, relief="flat", font=("Arial", 20))
-        self.listBox.grid(row=1,column=1, sticky="nswe")
-        self.scrollStyle = ttk.Style()
-        self.scrollStyle.configure("TScrollbar",background="#000000")
-        self.scrollbar = ttk.Scrollbar(self.loadPage, orient="vertical",command=self.listBox.yview)
+        # Predefining title and button styl
+        titleFont = ("Arial", 40, "bold")
+        self.midButtonStyle = ttk.Style()
+        self.midButtonStyle.configure('mid.TButton', font=("Arial", 15))
+        self.smallButtonStyle = ttk.Style()
+        self.smallButtonStyle.configure('small.TButton', font=("Arial", 10), bootstyle="dark-outline")
+
+        # Specific Setting
+        column = ("indexNum", "fileName")
+        self.loadPageLabel = ttk.Label(self.loadPage, text="Locate The CSV Files", anchor="center", font=titleFont)
+        self.openFolderButton = ttk.Button(self.loadPage, text="Open Folder", bootstyle="dark-outline", command=lambda:[self.queryFolderPath()])
+        self.fileTree = ttk.Treeview(self.loadPage, columns = column, show="headings", bootstyle="dark")
+        self.scrollbar = ttk.Scrollbar(self.loadPage, orient="vertical",command=self.fileTree.yview)
+        self.deleteBtn = ttk.Button(self.loadPage, text="Delete", style="small.TButton", command=lambda:[self.deleteFile()])
+        self.clearBtn = ttk.Button(self.loadPage, text="Clear", style="small.TButton", command=lambda:[self.clearAllFiles()])
+        self.backButton = ttk.Button(self.loadPage, text="Back", style="mid.TButton", command=lambda:[self.showPage(self.mainPage)])
+        self.nextButton = ttk.Button(self.loadPage, text="Next", style="mid.TButton", command=lambda:[self.openViewPage()])
+
+        # Show on screen    
+        self.loadPageLabel.grid(row=0,column=0, sticky="nwe", pady=(30,0), columnspan=3)
+        self.openFolderButton.grid(row=0,column=1, sticky="s", pady=(0,10), ipady=1, ipadx=40)
+        self.fileTree.grid(row=1,column=1, sticky="nswe")
         self.scrollbar.grid(row=1,column=2,sticky="wns")
-        self.listBox.configure(yscrollcommand=self.scrollbar.set)
+        self.fileTree.configure(yscrollcommand=self.scrollbar.set)
+        self.backButton.grid(row=2,column=0, sticky="s", pady=(0,20), padx=(0,0), ipadx=20, ipady=5)
+        self.nextButton.grid(row=2,column=2, sticky="s", pady=(0,20), padx=(0,0), ipadx=20, ipady=5)
+        self.deleteBtn.grid(row=2, column=1)
+
+        # Setting table for list of files
+        self.fileTree.column("indexNum", anchor="w")
+        self.fileTree.column("fileName", anchor="w")
+        self.fileTree.heading("indexNum", text="#", anchor="w")
+        self.fileTree.heading("fileName", text="File Name", anchor="w")
+        self.fileTree.column("indexNum", width=50, minwidth=50, stretch=tk.NO)
+        self.fileTree.column("fileName", width=10, minwidth=10)
+        
+        
+    def queryFolderPath(self):
+        folderPath = fd.askdirectory()
+        filesList = []
+        if folderPath != "":
+            try:
+                for file in os.listdir(folderPath):
+                    if file.endswith(".csv"):
+                        filesList.append(os.path.join(folderPath, file))
+                self.dataHandler.setFilesPathList(filesList)
+                self.displayFiles()
+            except FileNotFoundError:
+                print("ERROR")
+
+
+    def displayFiles(self):
+        for i in self.fileTree.get_children():
+            self.fileTree.delete(i)
+
+        filesList = self.dataHandler.getFilesPathList()
+        try:
+            for index, file in enumerate(filesList):
+                self.fileTree.insert("",ttk.END, values=(index+1,file))
+        except:
+            print("ERROR")
+
+    def clearAllFiles(self):
+        for i in self.fileTree.get_children():
+            self.fileTree.delete(i)
+
+        self.dataHandler.setFilesPathList=[]
+
+    def deleteFile(self):
+        selections = self.fileTree.selection()        
+        for item in selections:
+            self.fileTree.delete(item)
+
+        newList = []
+        i = 0
+        for row in self.fileTree.get_children():
+            for filePath in self.fileTree.item(row)["values"]:
+                if i % 2 == 1:
+                    newList.append(filePath)
+                i+=1
+
+
+        self.dataHandler.setFilesPathList(newList)
+
+        self.displayFiles()
 
     def showPage(self, frame):
         frame.tkraise()

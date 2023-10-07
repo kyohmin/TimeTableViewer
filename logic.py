@@ -500,7 +500,10 @@ dataHandler.setSchedules()
 # Initializing Display Option Handler Class
 displayHandler = DisplayHandler(dataHandler.getSchedules(), dataHandler.getRangeList())
 
-displayHandler.filterSchedule("moduleCode", "DCNG")
+
+# displayHandler.filterSchedule("moduleCode", "DM")
+displayHandler.filterSchedule("location", "")
+
 
 displayHandler.sort("activityDate", True)
 
