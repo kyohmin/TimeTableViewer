@@ -2,6 +2,10 @@ import os, csv
 import math
 import datetime
 
+import tkinter as tk
+import ttkbootstrap as ttk
+from tkinter import filedialog as fd
+
 
 # ===== Custom Data Structures =====
 class Node:
@@ -18,6 +22,7 @@ class Node:
 class LinkedList:
     def __init__(self):
         self.head = None
+        self.tail = None
     
     def __iter__(self):
         currentNode = self.head
@@ -37,13 +42,11 @@ class LinkedList:
         newNode = Node(data)
         if self.head == None:
             self.head = newNode
+            self.tail = newNode
         
         else:
-            currentNode = self.head
-            while currentNode.next != None:
-                currentNode = currentNode.next
-
-            currentNode.next = newNode
+            self.tail.next = newNode
+            self.tail= newNode
 
 class HashNode:
     def __init__(self, key = -1):
@@ -143,8 +146,25 @@ class Schedule():
         self.__lecturer = lecturer
         self.__zone = zone
     
-    def getDetail(self) -> list:
-        return self.__module, self.__moduleCode, self.__cohort, self.__course, self.__fullPart, self.__session, self.__activityDate, self.__scheduledDay, self.__startTime, self.__endTime, self.__duration, self.__location, self.__size, self.__lecturer, self.__zone
+    def get(self, key) -> dict:
+        value = {
+            "module" : self.__module, "moduleCode" : self.__moduleCode, "cohort" : self.__cohort,
+            "course" : self.__course, "fullPart" : self.__fullPart, "session" : self.__session,
+            "activityDate" : self.__activityDate, "scheduledDay" : self.__scheduledDay,
+            "startTime" : self.__startTime, "endTime" : self.__endTime, "duration" : self.__duration,
+            "location" : self.__location, "size" : self.__size, "lecturer" : self.__lecturer, "zone" : self.__zone
+        }[key]
+        
+        return value
+    
+    def getAll(self) -> list:
+        li = [
+            self.__module, self.__moduleCode, self.__cohort, self.__course, self.__fullPart,
+            self.__session, self.__activityDate, self.__scheduledDay, self.__startTime,
+            self.__endTime, self.__duration, self.__location, self.__size, self.__lecturer, self.__zone
+        ]
+
+        return  li
 
 
 
@@ -154,8 +174,9 @@ class DataHandler:
         self.__schedules = LinkedList()
         self.__filesPathList = []
         self.__folderPath = "/Users/khms/CODE/ALGO/dataset"
+        self.__rangeList = []
 
-        # Hash Set for range and availability check
+        # To hand over the range number to DisplayHandler for intialization of Hash Table
         self.__moduleRange = set()
         self.__moduleCodeRange = set()
         self.__cohortRange = set()
@@ -172,47 +193,44 @@ class DataHandler:
         self.__lecturerRange = set()
         self.__zoneRange = set()
 
-        # Used for initializing HashTable
-        self.__rangeList = []
-
-    def storeSchedules(self):
+    def setSchedules(self):
         self.__queryFiles()
+        self.__schedules.head = None  # Reset the head before storing the schedules
+        self.__resetRange()
+
         for fileDirectory in self.__filesPathList:
             with open(fileDirectory, "r") as csvfile:
                 csvData = csv.reader(csvfile, delimiter=",")
                 for row in csvData:
                     if row[0] == '':
                         continue
+
                     module, moduleCode, cohort, course, fullPart, session = self.__extractData(row[1], row[2])
-                    self.__storeRange(module, moduleCode, cohort, course, fullPart, session, row[3], row[4], row[5], row[6], row[7], row[8], row[9], row[10], row[11])
-                    self.__schedules.append(Schedule(module, moduleCode, cohort, course, fullPart, session, self.__dateInput(row[3]), self.__dateInput(row[3]).isoweekday(), self.__timeInput(row[5]), self.__timeInput(row[6]), row[7], row[8], row[9], row[10], row[11]))
+
+                    self.__setRange(
+                        module, moduleCode, cohort, course, fullPart, session, self.__dateInput(row[3]),
+                        self.__dateInput(row[3]).isoweekday(), self.__timeInput(row[5]),
+                        self.__timeInput(row[6]),row[7], row[8], row[9], row[10], row[11]
+                    )
+                    
+                    self.__schedules.append(
+                        Schedule(
+                            module, moduleCode, cohort, course, fullPart, session, self.__dateInput(row[3]),
+                            self.__dateInput(row[3]).isoweekday(), self.__timeInput(row[5]), self.__timeInput(row[6]),
+                            row[7], row[8], row[9], row[10], row[11]
+                        )
+                    )
 
         # Storing size of range for optimal hashtable size
         self.__rangeList = [len(self.__moduleRange), len(self.__moduleCodeRange), len(self.__cohortRange), len(self.__courseRange), len(self.__fullPartRange), 
                             len(self.__sessionRange), len(self.__activityDateRange), len(self.__scheduledDayRange), len(self.__startTimeRange), len(self.__endTimeRange), 
                             len(self.__durationRange), len(self.__locationRange), len(self.__sizeRange), len(self.__lecturerRange), len(self.__zoneRange)]
-        
-    def filteringOption(self, sortedResult:LinkedList) -> LinkedList:
-        self.__resetRange()
 
-        for schedule in sortedResult:
-            self.__moduleRange.add(schedule.data.getDetail()[0])
-            self.__moduleCodeRange.add(schedule.data.getDetail()[1])
-            self.__cohortRange.add(schedule.data.getDetail()[2])
-            self.__courseRange.add(schedule.data.getDetail()[3])
-            self.__fullPartRange.add(schedule.data.getDetail()[4])
-            self.__sessionRange.add(schedule.data.getDetail()[5])
-            self.__activityDateRange.add(schedule.data.getDetail()[6])
-            self.__scheduledDayRange.add(schedule.data.getDetail()[7])
-            self.__startTimeRange.add(schedule.data.getDetail()[8])
-            self.__endTimeRange.add(schedule.data.getDetail()[9])
-            self.__durationRange.add(schedule.data.getDetail()[10])
-            self.__locationRange.add(schedule.data.getDetail()[11])
-            self.__sizeRange.add(schedule.data.getDetail()[12])
-            self.__lecturerRange.add(schedule.data.getDetail()[13])
-            self.__zoneRange.add(schedule.data.getDetail()[14])
-
-        return self.__moduleRange, self.__moduleCodeRange, self.__cohortRange, self.__courseRange, self.__fullPartRange, self.__sessionRange, self.__activityDateRange, self.__scheduledDayRange, self.__startTimeRange, self.__endTimeRange, self.__durationRange, self.__locationRange, self.__sizeRange, self.__lecturerRange, self.__zoneRange
+    def getSchedules(self) -> Node:
+        return self.__schedules.head
+    
+    def getRangeList(self) -> list:
+        return self.__rangeList
 
     def __queryFiles(self):
         if self.__folderPath != "":
@@ -223,17 +241,25 @@ class DataHandler:
             except FileNotFoundError:
                 self.__filesPathList
 
-    def __storeRange(self, module:str, moduleCode:str, cohort:str, course:str, fullPart:str, session:str, activityDate:str, scheduleDay:str, startTime:str, endTime:str, duration:str, location:str, size:str, lecturer:str, zone:str):
+    def __dateInput(self, strVal):
+        day, month, year = strVal.split("/")
+        return datetime.date(int(year),int(month),int(day))
+
+    def __timeInput(self, strVal):
+        hour, minute,second = strVal.split(":")
+        return datetime.time(int(hour),int(minute),int(second))
+
+    def __setRange(self, module:str, moduleCode:str, cohort:str, course:str, fullPart:str, session:str, activityDate:str, scheduleDay:str, startTime:str, endTime:str, duration:str, location:str, size:str, lecturer:str, zone:str):
         self.__moduleRange.add(module)
         self.__moduleCodeRange.add(moduleCode)
         self.__cohortRange.add(cohort)
         self.__courseRange.add(course)
         self.__fullPartRange.add(fullPart)
         self.__sessionRange.add(session)
-        self.__activityDateRange.add(self.__dateInput(activityDate))
-        self.__scheduledDayRange.add(self.__dateInput(activityDate).isoweekday())
-        self.__startTimeRange.add(self.__timeInput(startTime))
-        self.__endTimeRange.add(self.__timeInput(endTime))
+        self.__activityDateRange.add(activityDate)
+        self.__scheduledDayRange.add(scheduleDay)
+        self.__startTimeRange.add(startTime)
+        self.__endTimeRange.add(endTime)
         self.__durationRange.add(duration)
         self.__locationRange.add(location)
         self.__sizeRange.add(size)
@@ -262,29 +288,15 @@ class DataHandler:
         self.__locationRange.clear()
         self.__sizeRange.clear()
         self.__lecturerRange.clear()
-        self.__zoneRange.clear()
-
-    def getSchedules(self) -> LinkedList:
-        return self.__schedules
-    
-    def getRange(self) -> list:
-        return self.__rangeList
-    
-    def __dateInput(self, strVal):
-        day, month, year = strVal.split("/")
-        return datetime.date(int(year),int(month),int(day))
-
-    def __timeInput(self, strVal):
-        hour, minute,second = strVal.split(":")
-        return datetime.time(int(hour),int(minute),int(second))
+        self.__zoneRange.clear() 
 
     
 
-class DisplayOptionHandler:
-    def __init__(self, schedules:str, rangeList:list):
+class DisplayHandler:
+    def __init__(self, schedulesHead:Node, rangeList:list):
         # In case the user does not want to filter, the lined list's starting point is stored
-        self.__originalSchedules = schedules    # For backup when user wants to filter again
-        self.__sortedSchedules= self.__originalSchedules
+        self.__originalSchedules = schedulesHead    # For backup when user wants to filter again
+        self.__sortedSchedules = self.__originalSchedules
 
         # For filtering data. Used Custom Hash Table. Custom Hash Table stores linked list for common key value
         self.__moduleHT = HashTable(rangeList[0])
@@ -303,22 +315,7 @@ class DisplayOptionHandler:
         self.__lecturerHT = HashTable(rangeList[13])
         self.__zoneHT = HashTable(rangeList[14])
 
-    def setFilter(self, schedule:Node):
-        self.__moduleHT.add(schedule.data.getDetail()[0], schedule.data)
-        self.__moduleCodeHT.add(schedule.data.getDetail()[1], schedule.data)
-        self.__cohortHT.add(schedule.data.getDetail()[2], schedule.data)
-        self.__courseHT.add(schedule.data.getDetail()[3], schedule.data)
-        self.__fullPartHT.add(schedule.data.getDetail()[4], schedule.data)
-        self.__sessionHT.add(schedule.data.getDetail()[5], schedule.data)
-        self.__activityDateHT.add(schedule.data.getDetail()[6], schedule.data)
-        self.__scheduledDayHT.add(schedule.data.getDetail()[7], schedule.data)
-        self.__startTimeHT.add(schedule.data.getDetail()[8], schedule.data)
-        self.__endTimeHT.add(schedule.data.getDetail()[9], schedule.data)
-        self.__durationHT.add(schedule.data.getDetail()[10], schedule.data)
-        self.__locationHT.add(schedule.data.getDetail()[11], schedule.data)
-        self.__sizeHT.add(schedule.data.getDetail()[12], schedule.data)
-        self.__lecturerHT.add(schedule.data.getDetail()[13], schedule.data)
-        self.__zoneHT.add(schedule.data.getDetail()[14], schedule.data)
+        self.__setFilter(schedulesHead)
     
     def filterSchedule(self, category:str, specificValue:str) -> LinkedList:
         tmp = None
@@ -353,8 +350,7 @@ class DisplayOptionHandler:
         elif category == "zone":
             tmp = self.__zoneHT.get(specificValue)
 
-        self.__sortedSchedules = tmp
-        return self.__sortedSchedules
+        self.__sortedSchedules = tmp.head
 
     def commonSchedules(self, filterStack:Stack) -> LinkedList:
         # Restore before doing it
@@ -381,30 +377,84 @@ class DisplayOptionHandler:
     def restoreSortedSchedules(self):
         self.__sortedSchedules = self.__originalSchedules
 
-    def getResult(self) -> LinkedList:
+    def rangeSearch(self,start, end, category):
+        head = self.__sortedSchedules.head
+        self.__mergeSort(head, category)
+        endNode = head
+        startFound = False
+        for i in self.__sortedSchedules.head:
+            if i.data.get(category) < start and startFound== False:
+                head = i.next
+                if i.data.get(category) > start: startFound = True
+            if i.data.get(category) > end:  
+                break
+
+            endNode = i
+
+        endNode.next = None
+        
+        self.__sortedSchedules.head = head
+
+    def getResult(self) -> Node:
         return self.__sortedSchedules
     
-    def sort(self, category, isAscending):
-        return self.__sortedSchedules
-        pass
+    def sort(self, category, isAscending=True):
+        head = self.__sortedSchedules
 
-    def mergeSort(self, head, category=0) -> "Node":
+        self.__sortedSchedules = self.__mergeSort(head, category)
+
+        # For Descending Order
+        if isAscending == False:
+            stack = Stack()
+
+            for i in self.__sortedSchedules:
+                stack.push(i)
+
+            newHead = currentNode = stack.pop()
+
+            while not stack.isEmpty():
+                currentNode.next = stack.pop()
+                currentNode = currentNode.next
+
+            currentNode.next = None
+
+            self.__sortedSchedules = newHead
+
+    def __setFilter(self, schedules: Node):
+        for schedule in schedules:
+            self.__moduleHT.add(schedule.data.get("module"), schedule.data)
+            self.__moduleCodeHT.add(schedule.data.get("moduleCode"), schedule.data)
+            self.__cohortHT.add(schedule.data.get("cohort"), schedule.data)
+            self.__courseHT.add(schedule.data.get("course"), schedule.data)
+            self.__fullPartHT.add(schedule.data.get("fullPart"), schedule.data)
+            self.__sessionHT.add(schedule.data.get("session"), schedule.data)
+            self.__activityDateHT.add(schedule.data.get("activityDate"), schedule.data)
+            self.__scheduledDayHT.add(schedule.data.get("scheduledDay"), schedule.data)
+            self.__startTimeHT.add(schedule.data.get("startTime"), schedule.data)
+            self.__endTimeHT.add(schedule.data.get("endTime"), schedule.data)
+            self.__durationHT.add(schedule.data.get("duration"), schedule.data)
+            self.__locationHT.add(schedule.data.get("location"), schedule.data)
+            self.__sizeHT.add(schedule.data.get("size"), schedule.data)
+            self.__lecturerHT.add(schedule.data.get("lecturer"), schedule.data)
+            self.__zoneHT.add(schedule.data.get("zone"), schedule.data)
+
+    def __mergeSort(self, head, category) -> "Node":
         if head is None or head.next is None:
             return head
 
-        mid = self.split(head)
+        mid = self.__split(head)
         left = head
         right = mid.next
         mid.next = None 
 
-        left = self.mergeSort(left, category)
-        right = self.mergeSort(right, category)
+        left = self.__mergeSort(left, category)
+        right = self.__mergeSort(right, category)
 
-        sorted_list = self.merge(left, right, category)
+        sortedHead = self.__merge(left, right, category)
 
-        return sorted_list
+        return sortedHead
 
-    def split(self, head):
+    def __split(self, head):
         half = head
         end = head
 
@@ -414,13 +464,13 @@ class DisplayOptionHandler:
 
         return half
 
-    def merge(self, left, right, category):
+    def __merge(self, left, right, category):
         startNode = Node(None)
         currentNode = startNode
 
         # Loop through to sort between two linked lists
         while left is not None and right is not None:
-            if left.data.getDetail()[category] < right.data.getDetail()[category]:
+            if left.data.get(category) < right.data.get(category):
                 currentNode.next = left
                 left = left.next
             else:
@@ -438,67 +488,125 @@ class DisplayOptionHandler:
         return startNode.next  # Because first Node was used to create rest of the nodes
 
 
-    def rangeSearch(self,start, end, category):
-        head = self.__sortedSchedules.head
-        endNode = head
-        startFound = False
-        for i in self.__sortedSchedules.head:
-            if i.data.getDetail()[category] < start and startFound== False:
-                head = i.next
-                if i.data.getDetail()[category] > start: startFound = True
-            if i.data.getDetail()[category] > end:  
-                break
-
-            endNode = i
-
-        endNode.next = None
-        
-        self.__sortedSchedules.head = head
-    
-    def setHead(self, node):
-        self.__sortedSchedules.head = node
 
 # 1: Module, 2: Module code, 3: cohort, 4: Course, 5: Full/Part, 6: Session, 7: Activity Date, 8: ScheduledDay, 9: Start Time, 10: End Time
 # 11: Duration, 12: Location 13: Size, 14: Lecturer, 15: Zone
 
 
+class GUI(ttk.Window):
+    def __init__(self):
+        self.dataHandler = DataHandler()
+        # self.displayOptionHandler = DisplayHandler()
+
+        # Make a window setting
+        self.initProgram()
+
+
+        self.viewPage.grid(row=0, column=0, sticky="nswe")
+        
+        self.showPage(self.mainPage)
+        self.mainloop()
+
+    def initProgram(self):
+        super().__init__()
+        theme = ttk.Style()
+        theme.theme_use("flatly")
+        self.resizable(False,False)
+        self.title("Timetable Viewer")
+        self.geometry("750x500+200+200")
+        self.rowconfigure(0, weight = 0)
+        self.columnconfigure(0, weight=1)
+
+        # Initializing the pages
+        self.mainPage = ttk.Frame(self)
+        self.loadPage = ttk.Frame(self)
+        self.viewPage = ttk.Frame(self, width = 1500, height=500)
+        self.initMainPage()
+        self.initLoadPage()
+
+    def initMainPage(self):
+        # Setting Page
+        self.mainPage.grid(row=0, column=0, sticky="nswe")
+        self.mainPage.rowconfigure(0,weight= 5)
+        self.mainPage.rowconfigure(1,weight= 6)
+        self.mainPage.columnconfigure(0,weight=1)
+        self.mainPage.columnconfigure(1,weight=1)
+        self.mainPage.columnconfigure(2,weight=1)
+        self.mainPage.columnconfigure(3,weight=1)
+        self.mainPage.columnconfigure(4,weight=1)
+
+        # Predefining title and button style
+        self.titleFont = ("Arial", 40, "bold")
+        self.myButtonStyle = ttk.Style()
+        self.myButtonStyle.configure('my.TButton', font=("Arial", 20))
+
+        # Specific Setting
+        self.mainPageLabel = ttk.Label(self.mainPage, text="Timetable Viewer", font = self.titleFont)
+        self.mainPageSeparator = ttk.Separator(self.mainPage, bootstyle="primary")
+        self.startBtn = ttk.Button(self.mainPage, text="START", style="my.TButton", command=lambda:[self.showPage(self.loadPage)])
+        self.exitBtn = ttk.Button(self.mainPage, text="EXIT", style="my.TButton", command=self.destroy)
+
+        # Show on screen       
+        self.mainPageLabel.grid(row = 0 , column=2, sticky = "s", pady=(0,30))
+        self.mainPageSeparator.grid(row = 0, column=2, sticky= "swe", pady=(0,0), padx=200)
+        self.startBtn.grid(row = 1, column = 2, sticky = "nwe", pady=(60), ipady = 10, padx=100)
+        self.exitBtn.grid(row = 1, column = 2, sticky = "nwe", pady=(135,0), ipady=10, padx=100)
+
+    def initLoadPage(self):
+        self.loadPage.grid(row=0, column=0, sticky="nswe")
+        self.loadPage.rowconfigure(0,weight=4)
+        self.loadPage.rowconfigure(1,weight=4)
+        self.loadPage.rowconfigure(2,weight=2)
+        self.loadPage.columnconfigure(0,weight=1)
+        self.loadPage.columnconfigure(1,weight=3)
+        self.loadPage.columnconfigure(2,weight=1)
+
+        self.loadPageLabel = ttk.Label(self.loadPage, text="Locate the Folder with CSV files", anchor="center", font=("Arial", 26, "bold"),borderwidth=10, relief="solid")
+        self.loadPageLabel.grid(row=0,column=1, sticky="nwe", pady=(50,0))
+        self.openFolderButton = ttk.Button(self.loadPage, text="Open Folder", style="my.TButton", command=lambda:[self.queryFolderDirectory()])
+        self.openFolderButton.grid(row=0,column=1, sticky="n", pady=(120,0), ipady=5, ipadx=40)
+        self.backButton = ttk.Button(self.loadPage, text="back", style="my.TButton", command=lambda:[self.changeFrame(self.mainPage)])
+        self.backButton.grid(row=2,column=0, sticky="s", pady=(0,20), padx=20, ipadx=30, ipady=7)
+        self.nextButton = ttk.Button(self.loadPage, text="next", style="my.TButton", command=lambda:[self.openViewPage()])
+        self.nextButton.grid(row=2,column=2, sticky="s", pady=(0,20), padx=20, ipadx=30, ipady=5)
+        self.listBox = tk.Listbox(self.loadPage, relief="flat", font=("Arial", 20))
+        self.listBox.grid(row=1,column=1, sticky="nswe")
+        self.scrollStyle = ttk.Style()
+        self.scrollStyle.configure("TScrollbar",background="#000000")
+        self.scrollbar = ttk.Scrollbar(self.loadPage, orient="vertical",command=self.listBox.yview)
+        self.scrollbar.grid(row=1,column=2,sticky="wns")
+        self.listBox.configure(yscrollcommand=self.scrollbar.set)
+
+    def showPage(self, frame):
+        frame.tkraise()
 
 # MAIN ====================
 
-# Initialize DataHandler Class
-dataHandler = DataHandler()
-# (Place for ENtering path location) #
-dataHandler.storeSchedules()
+a = GUI()
+
+
+
 
 # Initializing Display Option Handler Class
-displayOptionHandler = DisplayOptionHandler(dataHandler.getSchedules(),dataHandler.getRange())
+# displayHandler = DisplayHandler(dataHandler.getSchedules(), dataHandler.getRangeList())
 
-a = 1
+# displayHandler.filterSchedule("moduleCode", "DCNG")
 
-# Filter Setting
-for schedule in dataHandler.getSchedules():
-    displayOptionHandler.setFilter(schedule)
-    a+=1
+# displayHandler.sort("activityDate", True)
+
+# a =0
+# for i in displayHandler.getResult():
+#     print(i.data.getAll())
+#     a+=1
+# print(a)
+
+# print("============")
+# displayHandler.sort("module")
 
 
 
-print("============")
-# displayOptionHandler.filterSchedule("moduleCode", "ISOG")
-a = displayOptionHandler.mergeSort(displayOptionHandler.getResult().head, 6)
-displayOptionHandler.setHead(a)
-
-displayOptionHandler.rangeSearch(datetime.date(2020,5,20), datetime.date(2050,5,27),6)
-
-for i in displayOptionHandler.getResult():
-    print(i.data.getDetail()[1])
 
 
 print("============")
 
-# This is for option 
-print(sorted(dataHandler.filteringOption(displayOptionHandler.getResult())[5]))
 
-
-
-
-# def filter(category, specificData):
