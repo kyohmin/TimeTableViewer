@@ -641,6 +641,7 @@ class GUI(ttk.Window):
 
 
         self.dataHandler.setFilesPathList(newList)
+        
 
         self.displayFiles()
 
