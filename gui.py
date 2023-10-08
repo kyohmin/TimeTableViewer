@@ -237,8 +237,14 @@ class DataHandler:
     def getFilesPathList(self):
         return self.__filesPathList
 
-    def setRange(self):
-        pass
+    def setRange(self, schedules):
+        self.__resetRange()
+        try:
+            for i in schedules:
+                module, moduleCode, cohort, course, fullPart, session, activityDate, scheduleDay, startTime, endTime, duration, location, size, lecturer, zone = i.data.getAll()
+                self.__setRange(module, moduleCode, cohort, course, fullPart, session, activityDate, scheduleDay, startTime, endTime, duration, location, size, lecturer, zone)
+        except:
+            pass
 
     def getRange(self, category):
         value = {
@@ -310,6 +316,7 @@ class DataHandler:
         self.__lecturerRange.clear()
         self.__zoneRange.clear() 
 
+
     
 
 class DisplayHandler:
@@ -358,7 +365,7 @@ class DisplayHandler:
         elif category == "startTime":
             tmp = self.__startTimeHT.get(specificValue)
         elif category == "endTime":
-            tmp = self.__endTime.get(specificValue)
+            tmp = self.__endTimeHT.get(specificValue)
         elif category == "duration":
             tmp = self.__durationHT.get(specificValue)
         elif category == "location":
@@ -370,29 +377,30 @@ class DisplayHandler:
         elif category == "zone":
             tmp = self.__zoneHT.get(specificValue)
 
-        return tmp
+        if tmp is not None:
+            return tmp.head
 
-    def commonSchedules(self, filterStack:Stack) -> LinkedList:
+    def commonSchedules(self, filteredSchedules) -> LinkedList:
         # Restore before doing it
-        self.restoreSortedSchedules()
+        # self.restoreSortedSchedules()
     
-        while not filterStack.isEmpty():
-            node1 = self.__sortedSchedules.head
-            node2 = filterStack.pop().head
-            resultLinkedList = LinkedList()
-            availabilityCheck = set()
-            while node2 is not None:
-                availabilityCheck.add(node2.data)
-                node2 = node2.next
 
-            while node1 is not None:
-                if node1.data in availabilityCheck:
-                    resultLinkedList.append(node1.data)
-                node1 = node1.next
+        node1 = self.__sortedSchedules
+        node2 = filteredSchedules
+        resultLinkedList = LinkedList()
+        availabilityCheck = set()
+        while node2 is not None:
+            availabilityCheck.add(node2.data)
+            node2 = node2.next
 
-            self.__sortedSchedules = resultLinkedList
+        while node1 is not None:
+            if node1.data in availabilityCheck:
+                resultLinkedList.append(node1.data)
+            node1 = node1.next
+
+        self.__sortedSchedules = resultLinkedList.head
             
-        return self.__sortedSchedules
+        # return self.__sortedSchedules
         
     def restoreSortedSchedules(self):
         self.__sortedSchedules = self.__originalSchedules
@@ -510,6 +518,8 @@ class DisplayHandler:
 
         return startNode.next  # Because first Node was used to create rest of the nodes
 
+    def setHead(self, head):
+        self.__sortedSchedules = head
 
 
 # 1: Module, 2: Module code, 3: cohort, 4: Course, 5: Full/Part, 6: Session, 7: Activity Date, 8: ScheduledDay, 9: Start Time, 10: End Time
@@ -627,19 +637,24 @@ class GUI(ttk.Window):
     def initViewPage(self):
         # Setting Page
         self.viewPage.grid(row=0, column=0, sticky="nswe")
-        self.viewPage.columnconfigure(0,weight=2)
-        self.viewPage.columnconfigure(1,weight=8)
+        self.viewPage.columnconfigure(0,weight=3)
+        self.viewPage.columnconfigure(1,weight=7)
         self.viewPage.rowconfigure(0,weight=1)
 
         # Split the screen in half
-        self.filterFrame = ttk.Frame(self.viewPage,bootstyle="primary")
+        self.filterFrame = ttk.Frame(self.viewPage,bootstyle="light")
         self.tableFrame = ttk.Frame(self.viewPage)
 
         # Setting for the splitted screen
         self.filterFrame.grid(row=0,column=0,sticky="nswe")
+        self.filterFrame.grid_propagate(False)
         self.tableFrame.grid(row=0,column=1,sticky="nswe")
-        
+        self.tableFrame.grid_propagate(False)
+
+
         self.filterFrame.columnconfigure(0,weight=1)
+        self.filterFrame.columnconfigure(1,weight=1)
+        self.filterFrame.columnconfigure(2,weight=1)
         self.filterFrame.rowconfigure(0,weight=1)
         self.filterFrame.rowconfigure(1,weight=1)
         self.filterFrame.rowconfigure(2,weight=1)
@@ -662,21 +677,21 @@ class GUI(ttk.Window):
         column = ["module", "moduleCode", "cohort", "course", "fullPart", "session", "activityDate", "scheduledDay", "startTime", "endTime", "duration","location","size","lecturer","zone"]
         self.scheduleViewer = ttk.Treeview(self.tableFrame, columns = column, show="headings", bootstyle="primary")
         self.scheduleViewer.grid(row=1,column=0, padx=(10,21), sticky="nswe", ipadx=200)
-        self.scheduleViewer.column("module", anchor="w", minwidth=300, width=10)
-        self.scheduleViewer.column("moduleCode", anchor="w", minwidth=100, width=10)
+        self.scheduleViewer.column("module", anchor="w", minwidth=150, width=10)
+        self.scheduleViewer.column("moduleCode", anchor="w", minwidth=70, width=10)
         self.scheduleViewer.column("cohort", anchor="w", minwidth=60, width=10)
         self.scheduleViewer.column("course", anchor="w", minwidth=100, width=10)
         self.scheduleViewer.column("fullPart", anchor="w", minwidth=70, width=10)
         self.scheduleViewer.column("session", anchor="w", minwidth=70, width=10)
         self.scheduleViewer.column("activityDate", anchor="w", minwidth=100, width=10)
-        self.scheduleViewer.column("scheduledDay", anchor="w", minwidth=100, width=10)
-        self.scheduleViewer.column("startTime", anchor="w", minwidth=100, width=10)
-        self.scheduleViewer.column("endTime", anchor="w", minwidth=100, width=10)
-        self.scheduleViewer.column("duration", anchor="w", minwidth=100, width=10)
-        self.scheduleViewer.column("location", anchor="w", minwidth=100, width=10)
-        self.scheduleViewer.column("size", anchor="w", minwidth=100, width=10)
-        self.scheduleViewer.column("lecturer", anchor="w", minwidth=200, width=10)
-        self.scheduleViewer.column("zone", anchor="w", minwidth=100, width=10)
+        self.scheduleViewer.column("scheduledDay", anchor="w", minwidth=80, width=10)
+        self.scheduleViewer.column("startTime", anchor="w", minwidth=80, width=10)
+        self.scheduleViewer.column("endTime", anchor="w", minwidth=80, width=10)
+        self.scheduleViewer.column("duration", anchor="w", minwidth=50, width=10)
+        self.scheduleViewer.column("location", anchor="w", minwidth=80, width=10)
+        self.scheduleViewer.column("size", anchor="w", minwidth=50, width=10)
+        self.scheduleViewer.column("lecturer", anchor="w", minwidth=100, width=10)
+        self.scheduleViewer.column("zone", anchor="w", minwidth=50, width=10)
 
         self.scheduleViewer.heading("module", text="Module", anchor="w")
         self.scheduleViewer.heading("moduleCode", text="Module Code",anchor="w")
@@ -703,29 +718,152 @@ class GUI(ttk.Window):
         
 
         # Specific Setting
-        self.filterLabel = ttk.Label(self.filterFrame, text="Filter Schedules", font=titleFont, bootstyle="inverse-primary")
+        self.filterLabel = ttk.Label(self.filterFrame, text="Filter Schedules", font=titleFont, bootstyle="inverse-light")
         self.backLoadButton = ttk.Button(self.filterFrame, text="Back", bootstyle="success",command=lambda:[self.showPage(self.loadPage)])
+        self.resetSchedulesButton = ttk.Button(self.filterFrame, text="Reset", bootstyle="success",command=lambda:[self.displayHandler.restoreSortedSchedules(), self.displaySchedules(),self.dataHandler.setRange(self.displayHandler.getResult()),self.updateOptions()])
+        menuButtonStyle = ttk.Style()
+        menuButtonStyle.configure("new.primary.Outline.TMenubutton", font=("Arial",15, "bold"))
 
         # Menubuttons
-        self.moduleMenu = ttk.Menubutton(self.filterFrame, bootstyle="secondary", text="Module")
+        self.moduleMenu = ttk.Menubutton(self.filterFrame, style="new.primary.Outline.TMenubutton", text="Module")
+        self.moduleCodeMenu = ttk.Menubutton(self.filterFrame, style="new.primary.Outline.TMenubutton", text="Module Code")
+        self.cohortMenu = ttk.Menubutton(self.filterFrame, style="new.primary.Outline.TMenubutton", text="Cohort")
+        self.courseMenu = ttk.Menubutton(self.filterFrame, style="new.primary.Outline.TMenubutton", text="Course")
+        self.fullPartMenu = ttk.Menubutton(self.filterFrame, style="new.primary.Outline.TMenubutton", text="Full / Part")
+        self.sessionMenu = ttk.Menubutton(self.filterFrame, style="new.primary.Outline.TMenubutton", text="Session")
+        self.activityDateMenu = ttk.Menubutton(self.filterFrame, style="new.primary.Outline.TMenubutton", text="Date")
+        self.scheduledDayMenu = ttk.Menubutton(self.filterFrame, style="new.primary.Outline.TMenubutton", text="Day")
+        self.startTimeMenu = ttk.Menubutton(self.filterFrame, style="new.primary.Outline.TMenubutton", text="Start Time")
+        self.endTimeMenu = ttk.Menubutton(self.filterFrame, style="new.primary.Outline.TMenubutton", text="End Time")
+        self.durationMenu = ttk.Menubutton(self.filterFrame, style="new.primary.Outline.TMenubutton", text="Duration")
+        self.locationMenu = ttk.Menubutton(self.filterFrame, style="new.primary.Outline.TMenubutton", text="Location")
+        self.sizeMenu = ttk.Menubutton(self.filterFrame, style="new.primary.Outline.TMenubutton", text="Size")
+        self.lecturerMenu = ttk.Menubutton(self.filterFrame, style="new.primary.Outline.TMenubutton", text="Lecturer")
+        self.zoneMenu = ttk.Menubutton(self.filterFrame, style="new.primary.Outline.TMenubutton", text="Zone")
         
 
         # Show on screen
-        self.filterLabel.grid(row=0, column=0)
-        self.backLoadButton.grid(row=6, column=0, sticky="s", pady=(0,20), padx=(0,0), ipadx=20, ipady=5)
-        self.moduleMenu.grid(row=1,column=0)
+        self.filterLabel.grid(row=0, column=0,columnspan=3)
+        self.backLoadButton.grid(row=6, column=0, sticky="s", pady=(0,10), padx=(0,0), ipadx=20, ipady=5)
+        self.resetSchedulesButton.grid(row=6, column=2, sticky="s", pady=(0,10), padx=(0,0), ipadx=20, ipady=5)
+        self.moduleMenu.grid(row=1,column=0,sticky="we",padx=10)
+        self.moduleCodeMenu.grid(row=1,column=1,sticky="we",padx=10)
+        self.cohortMenu.grid(row=1,column=2,sticky="we",padx=10)
+        self.courseMenu.grid(row=2,column=0,sticky="we",padx=10)
+        self.fullPartMenu.grid(row=2,column=1,sticky="we",padx=10)
+        self.sessionMenu.grid(row=2,column=2,sticky="we",padx=10)
+        self.activityDateMenu.grid(row=3, column=0,sticky="we",padx=10)
+        self.scheduledDayMenu.grid(row=3,column=1,sticky="we",padx=10)
+        self.locationMenu.grid(row=3,column=2,sticky="we",padx=10)
+        self.startTimeMenu.grid(row=4,column=0,sticky="we",padx=10)
+        self.endTimeMenu.grid(row=4,column=1,sticky="we",padx=10)
+        self.durationMenu.grid(row=4,column=2,sticky="we",padx=10)
+        self.lecturerMenu.grid(row=5,column=0,sticky="we",padx=10)
+        self.sizeMenu.grid(row=5,column=1,sticky="we",padx=10)
+        self.zoneMenu.grid(row=5,column=2,sticky="we",padx=10)
+
+        
 
     def selectedValue(self, category, value):
-        for i in self.displayHandler.getResult():
-            print(i.data.getAll())
-        print(value)
+        self.displayHandler.commonSchedules(self.displayHandler.filterSchedule(category,value))
+        
+        # Post-Filtering
+        self.dataHandler.setRange(self.displayHandler.getResult())
+        self.displaySchedules()
+        self.updateOptions()
 
     def updateOptions(self):
         moduleOptions = ttk.Menu(self.moduleMenu)
         self.moduleVar = tk.StringVar()
-        for x in self.dataHandler.getRange("module"):
+        for x in self.insertionSort(self.dataHandler.getRange("module")):
             moduleOptions.add_radiobutton(label=x, variable=self.moduleVar, command=lambda x=x:self.selectedValue("module",x))
         self.moduleMenu['menu'] = moduleOptions
+
+        moduleCodeOptions = ttk.Menu(self.moduleCodeMenu)
+        self.moduleCodeVar = tk.StringVar()
+        for x in self.insertionSort(self.dataHandler.getRange("moduleCode")):
+            moduleCodeOptions.add_radiobutton(label=x, variable=self.moduleCodeVar, command=lambda x=x:self.selectedValue("moduleCode",x))
+        self.moduleCodeMenu['menu'] = moduleCodeOptions
+
+        cohortOptions = ttk.Menu(self.cohortMenu)
+        self.cohortVar = tk.StringVar()
+        for x in self.insertionSort(self.dataHandler.getRange("cohort")):
+            cohortOptions.add_radiobutton(label=x, variable=self.cohortVar, command=lambda x=x:self.selectedValue("cohort",x))
+        self.cohortMenu['menu'] = cohortOptions
+
+        courseOptions = ttk.Menu(self.courseMenu)
+        self.courseVar = tk.StringVar()
+        for x in self.insertionSort(self.dataHandler.getRange("course")):
+            courseOptions.add_radiobutton(label=x, variable=self.courseVar, command=lambda x=x:self.selectedValue("course",x))
+        self.courseMenu['menu'] = courseOptions
+
+        fullPartOptions = ttk.Menu(self.fullPartMenu)
+        self.fullPartVar = tk.StringVar()
+        for x in self.insertionSort(self.dataHandler.getRange("fullPart")):
+            fullPartOptions.add_radiobutton(label=x, variable=self.fullPartVar, command=lambda x=x:self.selectedValue("fullPart",x))
+        self.fullPartMenu['menu'] = fullPartOptions
+
+        sessionOptions = ttk.Menu(self.sessionMenu)
+        self.sessionVar = tk.StringVar()
+        for x in self.insertionSort(self.dataHandler.getRange("session")):
+            sessionOptions.add_radiobutton(label=x, variable=self.sessionVar, command=lambda x=x:self.selectedValue("session",x))
+        self.sessionMenu['menu'] = sessionOptions
+
+        activityDateOptions = ttk.Menu(self.activityDateMenu)
+        self.activityDateVar = tk.StringVar()
+        for x in self.insertionSort(self.dataHandler.getRange("activityDate")):
+            activityDateOptions.add_radiobutton(label=x, variable=self.activityDateVar, command=lambda x=x:self.selectedValue("activityDate",x))
+        self.activityDateMenu['menu'] = activityDateOptions
+
+        day = ["", "Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+        scheduledDayOptions = ttk.Menu(self.scheduledDayMenu)
+        self.scheduledDayVar = tk.StringVar()
+        for x in self.insertionSort(self.dataHandler.getRange("scheduledDay")):
+            scheduledDayOptions.add_radiobutton(label=day[x], variable=self.scheduledDayVar, command=lambda x=x:self.selectedValue("scheduledDay",x))
+        self.scheduledDayMenu['menu'] = scheduledDayOptions
+
+        startTimeOptions = ttk.Menu(self.startTimeMenu)
+        self.startTimeVar = tk.StringVar()
+        for x in self.insertionSort(self.dataHandler.getRange("startTime")):
+            startTimeOptions.add_radiobutton(label=x, variable=self.startTimeVar, command=lambda x=x:self.selectedValue("startTime",x))
+        self.startTimeMenu['menu'] = startTimeOptions
+
+        endTimeOptions = ttk.Menu(self.endTimeMenu)
+        self.endTimeVar = tk.StringVar()
+        for x in self.insertionSort(self.dataHandler.getRange("endTime")):
+            endTimeOptions.add_radiobutton(label=x, variable=self.endTimeVar, command=lambda x=x:self.selectedValue("endTime",x))
+        self.endTimeMenu['menu'] = endTimeOptions
+
+        durationOptions = ttk.Menu(self.durationMenu)
+        self.durationVar = tk.StringVar()
+        for x in self.insertionSort(self.dataHandler.getRange("duration")):
+            durationOptions.add_radiobutton(label=x, variable=self.durationVar, command=lambda x=x:self.selectedValue("duration",x))
+        self.durationMenu['menu'] = durationOptions
+
+        locationOptions = ttk.Menu(self.locationMenu)
+        self.locationVar = tk.StringVar()
+        for x in self.insertionSort(self.dataHandler.getRange("location")):
+            locationOptions.add_radiobutton(label=x, variable=self.locationVar, command=lambda x=x:self.selectedValue("location",x))
+        self.locationMenu['menu'] = locationOptions
+
+        sizeOptions = ttk.Menu(self.sizeMenu)
+        self.sizeVar = tk.StringVar()
+        for x in self.insertionSort(self.dataHandler.getRange("size")):
+            sizeOptions.add_radiobutton(label=x, variable=self.sizeVar, command=lambda x=x:self.selectedValue("size",x))
+        self.sizeMenu['menu'] = sizeOptions
+
+        lecturerOptions = ttk.Menu(self.lecturerMenu)
+        self.lecturerVar = tk.StringVar()
+        for x in self.insertionSort(self.dataHandler.getRange("lecturer")):
+            lecturerOptions.add_radiobutton(label=x, variable=self.lecturerVar, command=lambda x=x:self.selectedValue("lecturer",x))
+        self.lecturerMenu['menu'] = lecturerOptions
+
+        zoneOptions = ttk.Menu(self.zoneMenu)
+        self.zoneVar = tk.StringVar()
+        for x in self.insertionSort(self.dataHandler.getRange("zone")):
+            zoneOptions.add_radiobutton(label=x, variable=self.zoneVar, command=lambda x=x:self.selectedValue("zone",x))
+        self.zoneMenu['menu'] = zoneOptions
+
 
         # moduleCodeOptions = ttk.Menu(self.moduleCodeMenu)
         # self.moduleCodeVar = tk.StringVar()
@@ -795,6 +933,8 @@ class GUI(ttk.Window):
         frame.tkraise()
 
     def displaySchedules(self):
+        for i in self.scheduleViewer.get_children():
+                self.scheduleViewer.delete(i)
         dayString = ["","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
         try:
             for schedule in self.displayHandler.getResult():
@@ -806,6 +946,19 @@ class GUI(ttk.Window):
             for i in self.scheduleViewer.get_children():
                 self.scheduleViewer.delete(i)
 
+    def insertionSort(self,arr):
+        newList = []
+        for i in arr: newList.append(i)
+
+        for i in range(1,len(newList)):
+            value = newList[i]
+            pointer = i
+            while pointer > 0 and newList[pointer-1] > value:
+                newList[pointer] = newList[pointer-1]
+                pointer -=1
+            newList[pointer] = value
+
+        return newList
 # MAIN ====================
 
 a = GUI()
