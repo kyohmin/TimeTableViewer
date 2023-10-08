@@ -4,6 +4,7 @@ import datetime
 
 import tkinter as tk
 import ttkbootstrap as ttk
+from ttkbootstrap.dialogs import Messagebox as mb
 from tkinter import filedialog as fd
 
 
@@ -193,7 +194,6 @@ class DataHandler:
         self.__zoneRange = set()
 
     def setSchedules(self):
-        self.__queryFiles()
         self.__schedules.head = None  # Reset the head before storing the schedules
         self.__resetRange()
 
@@ -236,6 +236,30 @@ class DataHandler:
 
     def getFilesPathList(self):
         return self.__filesPathList
+
+    def setRange(self):
+        pass
+
+    def getRange(self, category):
+        value = {
+        "module": self.__moduleRange,
+        "moduleCode": self.__moduleCodeRange,
+        "cohort": self.__cohortRange,
+        "course": self.__courseRange,
+        "fullPart": self.__fullPartRange,
+        "session": self.__sessionRange,
+        "activityDate": self.__activityDateRange,
+        "scheduledDay": self.__scheduledDayRange,
+        "startTime": self.__startTimeRange,
+        "endTime": self.__endTimeRange,
+        "duration": self.__durationRange,
+        "location": self.__locationRange,
+        "size": self.__sizeRange,
+        "lecturer": self.__lecturerRange,
+        "zone": self.__zoneRange,
+        }[category]
+
+        return value
 
     def __dateInput(self, strVal):
         day, month, year = strVal.split("/")
@@ -346,7 +370,7 @@ class DisplayHandler:
         elif category == "zone":
             tmp = self.__zoneHT.get(specificValue)
 
-        self.__sortedSchedules = tmp.head
+        return tmp
 
     def commonSchedules(self, filterStack:Stack) -> LinkedList:
         # Restore before doing it
@@ -417,22 +441,25 @@ class DisplayHandler:
             self.__sortedSchedules = newHead
 
     def __setFilter(self, schedules: Node):
-        for schedule in schedules:
-            self.__moduleHT.add(schedule.data.get("module"), schedule.data)
-            self.__moduleCodeHT.add(schedule.data.get("moduleCode"), schedule.data)
-            self.__cohortHT.add(schedule.data.get("cohort"), schedule.data)
-            self.__courseHT.add(schedule.data.get("course"), schedule.data)
-            self.__fullPartHT.add(schedule.data.get("fullPart"), schedule.data)
-            self.__sessionHT.add(schedule.data.get("session"), schedule.data)
-            self.__activityDateHT.add(schedule.data.get("activityDate"), schedule.data)
-            self.__scheduledDayHT.add(schedule.data.get("scheduledDay"), schedule.data)
-            self.__startTimeHT.add(schedule.data.get("startTime"), schedule.data)
-            self.__endTimeHT.add(schedule.data.get("endTime"), schedule.data)
-            self.__durationHT.add(schedule.data.get("duration"), schedule.data)
-            self.__locationHT.add(schedule.data.get("location"), schedule.data)
-            self.__sizeHT.add(schedule.data.get("size"), schedule.data)
-            self.__lecturerHT.add(schedule.data.get("lecturer"), schedule.data)
-            self.__zoneHT.add(schedule.data.get("zone"), schedule.data)
+        try:
+            for schedule in schedules:
+                self.__moduleHT.add(schedule.data.get("module"), schedule.data)
+                self.__moduleCodeHT.add(schedule.data.get("moduleCode"), schedule.data)
+                self.__cohortHT.add(schedule.data.get("cohort"), schedule.data)
+                self.__courseHT.add(schedule.data.get("course"), schedule.data)
+                self.__fullPartHT.add(schedule.data.get("fullPart"), schedule.data)
+                self.__sessionHT.add(schedule.data.get("session"), schedule.data)
+                self.__activityDateHT.add(schedule.data.get("activityDate"), schedule.data)
+                self.__scheduledDayHT.add(schedule.data.get("scheduledDay"), schedule.data)
+                self.__startTimeHT.add(schedule.data.get("startTime"), schedule.data)
+                self.__endTimeHT.add(schedule.data.get("endTime"), schedule.data)
+                self.__durationHT.add(schedule.data.get("duration"), schedule.data)
+                self.__locationHT.add(schedule.data.get("location"), schedule.data)
+                self.__sizeHT.add(schedule.data.get("size"), schedule.data)
+                self.__lecturerHT.add(schedule.data.get("lecturer"), schedule.data)
+                self.__zoneHT.add(schedule.data.get("zone"), schedule.data)
+        except TypeError:
+            pass
 
     def __mergeSort(self, head, category) -> "Node":
         if head is None or head.next is None:
@@ -497,8 +524,6 @@ class GUI(ttk.Window):
         # Make a window setting
         self.initProgram()
 
-
-        self.viewPage.grid(row=0, column=0, sticky="nswe")
         
         self.showPage(self.mainPage)
         self.mainloop()
@@ -509,16 +534,18 @@ class GUI(ttk.Window):
         theme.theme_use("flatly")
         self.resizable(False,False)
         self.title("Timetable Viewer")
-        self.geometry("750x500+200+200")
-        self.rowconfigure(0, weight = 0)
+        self.geometry("750x500+500+250")
+        self.rowconfigure(0, weight = 1)
         self.columnconfigure(0, weight=1)
 
         # Initializing the pages
         self.mainPage = ttk.Frame(self)
         self.loadPage = ttk.Frame(self)
         self.viewPage = ttk.Frame(self, width = 1500, height=500)
+
         self.initMainPage()
         self.initLoadPage()
+        self.initViewPage()
 
     def initMainPage(self):
         # Setting Page
@@ -562,8 +589,10 @@ class GUI(ttk.Window):
         titleFont = ("Arial", 40, "bold")
         self.midButtonStyle = ttk.Style()
         self.midButtonStyle.configure('mid.TButton', font=("Arial", 15))
-        self.smallButtonStyle = ttk.Style()
-        self.smallButtonStyle.configure('small.TButton', font=("Arial", 10), bootstyle="dark-outline")
+        self.deleteButtonStyle = ttk.Style()
+        self.deleteButtonStyle.configure('s.danger.Outline.TButton', font=("Arial", 10), bootstyle="dark-outline")
+        self.clearButtonStyle = ttk.Style()
+        self.clearButtonStyle.configure('s.warning.Outline.TButton', font=("Arial", 10), bootstyle="dark-outline")
 
         # Specific Setting
         column = ("indexNum", "fileName")
@@ -571,10 +600,10 @@ class GUI(ttk.Window):
         self.openFolderButton = ttk.Button(self.loadPage, text="Open Folder", bootstyle="dark-outline", command=lambda:[self.queryFolderPath()])
         self.fileTree = ttk.Treeview(self.loadPage, columns = column, show="headings", bootstyle="dark")
         self.scrollbar = ttk.Scrollbar(self.loadPage, orient="vertical",command=self.fileTree.yview)
-        self.deleteBtn = ttk.Button(self.loadPage, text="Delete", style="small.TButton", command=lambda:[self.deleteFile()])
-        self.clearBtn = ttk.Button(self.loadPage, text="Clear", style="small.TButton", command=lambda:[self.clearAllFiles()])
-        self.backButton = ttk.Button(self.loadPage, text="Back", style="mid.TButton", command=lambda:[self.showPage(self.mainPage)])
-        self.nextButton = ttk.Button(self.loadPage, text="Next", style="mid.TButton", command=lambda:[self.openViewPage()])
+        self.deleteBtn = ttk.Button(self.loadPage, text="Delete", style="s.danger.Outline.TButton", command=lambda:[self.deleteFile()])
+        self.clearBtn = ttk.Button(self.loadPage, text="Clear", style="s.warning.Outline.TButton", command=lambda:[self.clearAllFiles()])
+        self.backHomeButton = ttk.Button(self.loadPage, text="Back", style="mid.TButton", command=lambda:[self.showPage(self.mainPage)])
+        self.nextButton = ttk.Button(self.loadPage, text="Next", style="mid.TButton", command=lambda:[self.showPage(self.viewPage)])
 
         # Show on screen    
         self.loadPageLabel.grid(row=0,column=0, sticky="nwe", pady=(30,0), columnspan=3)
@@ -582,9 +611,10 @@ class GUI(ttk.Window):
         self.fileTree.grid(row=1,column=1, sticky="nswe")
         self.scrollbar.grid(row=1,column=2,sticky="wns")
         self.fileTree.configure(yscrollcommand=self.scrollbar.set)
-        self.backButton.grid(row=2,column=0, sticky="s", pady=(0,20), padx=(0,0), ipadx=20, ipady=5)
+        self.deleteBtn.grid(row=2, column=1, sticky="n", pady=(5,0), padx=(100,0))
+        self.clearBtn.grid(row=2, column=1, sticky="n", pady=(5,0), padx=(0,100))
+        self.backHomeButton.grid(row=2,column=0, sticky="s", pady=(0,20), padx=(0,0), ipadx=20, ipady=5)
         self.nextButton.grid(row=2,column=2, sticky="s", pady=(0,20), padx=(0,0), ipadx=20, ipady=5)
-        self.deleteBtn.grid(row=2, column=1)
 
         # Setting table for list of files
         self.fileTree.column("indexNum", anchor="w")
@@ -594,6 +624,111 @@ class GUI(ttk.Window):
         self.fileTree.column("indexNum", width=50, minwidth=50, stretch=tk.NO)
         self.fileTree.column("fileName", width=10, minwidth=10)
         
+    def initViewPage(self):
+        # Setting Page
+        self.viewPage.grid(row=0, column=0, sticky="nswe")
+        self.viewPage.columnconfigure(0,weight=2)
+        self.viewPage.columnconfigure(1,weight=8)
+        self.viewPage.rowconfigure(0,weight=1)
+
+        # Split the screen in half
+        self.filterFrame = ttk.Frame(self.viewPage,bootstyle="primary")
+        self.tableFrame = ttk.Frame(self.viewPage)
+
+        # Setting for the splitted screen
+        self.filterFrame.grid(row=0,column=0,sticky="nswe")
+        self.tableFrame.grid(row=0,column=1,sticky="nswe")
+        
+        self.filterFrame.columnconfigure(0,weight=1)
+        self.filterFrame.rowconfigure(0,weight=1)
+        self.filterFrame.rowconfigure(1,weight=1)
+        self.filterFrame.rowconfigure(2,weight=1)
+        self.filterFrame.rowconfigure(3,weight=1)
+        self.filterFrame.rowconfigure(4,weight=1)
+        self.filterFrame.rowconfigure(5,weight=1)
+        self.filterFrame.rowconfigure(6,weight=1)
+
+        self.tableFrame.columnconfigure(0, weight=1)
+        self.tableFrame.rowconfigure(0, weight=1)
+        self.tableFrame.rowconfigure(1, weight=5)
+        self.tableFrame.rowconfigure(2, weight=1)
+        
+
+        # Predefining
+        titleFont = ("Arial", 20, "bold")
+
+
+        # Table
+        column = ["module", "moduleCode", "cohort", "course", "fullPart", "session", "activityDate", "scheduledDay", "startTime", "endTime", "duration","location","size","lecturer","zone"]
+        self.scheduleViewer = ttk.Treeview(self.tableFrame, columns = column, show="headings", bootstyle="primary")
+        self.scheduleViewer.grid(row=1,column=0, padx=(10,21), sticky="nswe", ipadx=200)
+        self.scheduleViewer.column("module", anchor="w", minwidth=300, width=10)
+        self.scheduleViewer.column("moduleCode", anchor="w", minwidth=100, width=10)
+        self.scheduleViewer.column("cohort", anchor="w", minwidth=60, width=10)
+        self.scheduleViewer.column("course", anchor="w", minwidth=100, width=10)
+        self.scheduleViewer.column("fullPart", anchor="w", minwidth=70, width=10)
+        self.scheduleViewer.column("session", anchor="w", minwidth=70, width=10)
+        self.scheduleViewer.column("activityDate", anchor="w", minwidth=100, width=10)
+        self.scheduleViewer.column("scheduledDay", anchor="w", minwidth=100, width=10)
+        self.scheduleViewer.column("startTime", anchor="w", minwidth=100, width=10)
+        self.scheduleViewer.column("endTime", anchor="w", minwidth=100, width=10)
+        self.scheduleViewer.column("duration", anchor="w", minwidth=100, width=10)
+        self.scheduleViewer.column("location", anchor="w", minwidth=100, width=10)
+        self.scheduleViewer.column("size", anchor="w", minwidth=100, width=10)
+        self.scheduleViewer.column("lecturer", anchor="w", minwidth=200, width=10)
+        self.scheduleViewer.column("zone", anchor="w", minwidth=100, width=10)
+
+        self.scheduleViewer.heading("module", text="Module", anchor="w")
+        self.scheduleViewer.heading("moduleCode", text="Module Code",anchor="w")
+        self.scheduleViewer.heading("cohort", text="Cohort",anchor="w")
+        self.scheduleViewer.heading("course", text="Course",anchor="w")
+        self.scheduleViewer.heading("fullPart", text="Full/Part",anchor="w")
+        self.scheduleViewer.heading("session", text="Session",anchor="w")
+        self.scheduleViewer.heading("activityDate", text="Date",anchor="w")
+        self.scheduleViewer.heading("scheduledDay", text="Day",anchor="w")
+        self.scheduleViewer.heading("startTime", text="Start Time",anchor="w")
+        self.scheduleViewer.heading("endTime", text="End Time",anchor="w")
+        self.scheduleViewer.heading("duration", text="Duration",anchor="w")
+        self.scheduleViewer.heading("location", text="Location",anchor="w")
+        self.scheduleViewer.heading("size", text="Class Size",anchor="w")
+        self.scheduleViewer.heading("lecturer", text="Lecturer",anchor="w")
+        self.scheduleViewer.heading("zone", text="Zone",anchor="w")
+
+        self.scheduleScrollVerBar = ttk.Scrollbar(self.tableFrame, orient="vertical",command=self.scheduleViewer.yview)
+        self.scheduleScrollHorBar = ttk.Scrollbar(self.tableFrame, orient="horizontal",command=self.scheduleViewer.xview)
+        self.scheduleScrollVerBar.grid(row=1,column=0,sticky="ens",padx=(0,10))
+        self.scheduleScrollHorBar.grid(row=1,column=0,sticky="wes", padx=(10,10))
+        self.scheduleViewer.configure(yscrollcommand=self.scheduleScrollVerBar.set)
+        self.scheduleViewer.configure(xscrollcommand=self.scheduleScrollHorBar.set)
+        
+
+        # Specific Setting
+        self.filterLabel = ttk.Label(self.filterFrame, text="Filter Schedules", font=titleFont, bootstyle="inverse-primary")
+        self.backLoadButton = ttk.Button(self.filterFrame, text="Back", bootstyle="success",command=lambda:[self.showPage(self.loadPage)])
+
+        # Menubuttons
+        self.moduleMenu = ttk.Menubutton(self.filterFrame, bootstyle="secondary", text="Module")
+        
+
+        # Show on screen
+        self.filterLabel.grid(row=0, column=0)
+        self.backLoadButton.grid(row=6, column=0, sticky="s", pady=(0,20), padx=(0,0), ipadx=20, ipady=5)
+        self.moduleMenu.grid(row=1,column=0)
+
+    def selectedValue(self, category, value):
+        for i in self.displayHandler.getResult():
+            print(i.data.getAll())
+        print(value)
+
+    def updateOptions(self):
+        moduleOptions = ttk.Menu(self.moduleMenu)
+        self.moduleVar = tk.StringVar()
+        for x in self.dataHandler.getRange("module"):
+            moduleOptions.add_radiobutton(label=x, variable=self.moduleVar, command=lambda x=x:self.selectedValue("module",x))
+        self.moduleMenu['menu'] = moduleOptions
+
+        # moduleCodeOptions = ttk.Menu(self.moduleCodeMenu)
+        # self.moduleCodeVar = tk.StringVar()
         
     def queryFolderPath(self):
         folderPath = fd.askdirectory()
@@ -605,9 +740,11 @@ class GUI(ttk.Window):
                         filesList.append(os.path.join(folderPath, file))
                 self.dataHandler.setFilesPathList(filesList)
                 self.displayFiles()
+
+                if len(filesList) == 0:
+                    noFilesFound = mb.show_error("You chose a folder with no CSV files\nPlease choose a folder with CSV files", "No Files Error")
             except FileNotFoundError:
                 print("ERROR")
-
 
     def displayFiles(self):
         for i in self.fileTree.get_children():
@@ -624,7 +761,7 @@ class GUI(ttk.Window):
         for i in self.fileTree.get_children():
             self.fileTree.delete(i)
 
-        self.dataHandler.setFilesPathList=[]
+        self.dataHandler.setFilesPathList([])
 
     def deleteFile(self):
         selections = self.fileTree.selection()        
@@ -641,12 +778,33 @@ class GUI(ttk.Window):
 
 
         self.dataHandler.setFilesPathList(newList)
-        
+
 
         self.displayFiles()
 
     def showPage(self, frame):
+        if frame == self.viewPage:
+            self.geometry("1500x500+100+250")
+            self.dataHandler.setSchedules()
+            self.displayHandler = DisplayHandler(self.dataHandler.getSchedules(), self.dataHandler.getRangeList())
+            self.updateOptions()
+            self.displaySchedules()
+        else:
+            self.geometry("750x500+500+250")
+
         frame.tkraise()
+
+    def displaySchedules(self):
+        dayString = ["","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+        try:
+            for schedule in self.displayHandler.getResult():
+                li = schedule.data.getAll()
+                li[7] = dayString[li[7]]
+                self.scheduleViewer.insert("", tk.END, value=li)
+        except TypeError:
+            print("No Files")
+            for i in self.scheduleViewer.get_children():
+                self.scheduleViewer.delete(i)
 
 # MAIN ====================
 
