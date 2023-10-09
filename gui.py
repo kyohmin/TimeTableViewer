@@ -171,6 +171,7 @@ class Schedule():
 
 # ===== Handler Classes =====
 class DataHandler:
+
     def __init__(self):
         self.__schedules = LinkedList()
         self.__filesPathList = []
@@ -209,14 +210,14 @@ class DataHandler:
                     self.__setRange(
                         module, moduleCode, cohort, course, fullPart, session, self.__dateInput(row[3]),
                         self.__dateInput(row[3]).isoweekday(), self.__timeInput(row[5]),
-                        self.__timeInput(row[6]),row[7], row[8], row[9], row[10], row[11]
+                        self.__timeInput(row[6]),row[7].lstrip("0"), row[8], int(row[9]), row[10], row[11]
                     )
                     
                     self.__schedules.append(
                         Schedule(
                             module, moduleCode, cohort, course, fullPart, session, self.__dateInput(row[3]),
                             self.__dateInput(row[3]).isoweekday(), self.__timeInput(row[5]), self.__timeInput(row[6]),
-                            row[7], row[8], row[9], row[10], row[11]
+                            row[7].lstrip("0"), row[8], int(row[9]), row[10], row[11]
                         )
                     )
 
@@ -406,22 +407,45 @@ class DisplayHandler:
         self.__sortedSchedules = self.__originalSchedules
 
     def rangeSearch(self,start, end, category):
-        head = self.__sortedSchedules.head
-        self.__mergeSort(head, category)
-        endNode = head
-        startFound = False
-        for i in self.__sortedSchedules.head:
-            if i.data.get(category) < start and startFound== False:
-                head = i.next
-                if i.data.get(category) > start: startFound = True
-            if i.data.get(category) > end:  
-                break
+        if category == "time":
+            self.sort("startTime")
+            # Finding starting point that starts the range
+            head1 = self.__sortedSchedules
+            prev = None
+            for i in self.__sortedSchedules:
+                if i.data.get("startTime") >= start:
+                    if prev is not None:
+                        head1 = i
+                    break
 
-            endNode = i
+            self.commonSchedules(head1)
+            self.sort("endTime")
+            
+            tail = self.__sortedSchedules
+            tail = None
+            for i in self.__sortedSchedules:
+                if i.data.get("endTime") > end:
+                    if tail is not None:
+                        tail.next = None
+                    break
+                tail = i
 
-        endNode.next = None
-        
-        self.__sortedSchedules.head = head
+        else:    
+            self.sort(category)
+            head = self.__sortedSchedules
+            endNode = None
+            startFound = False
+            for i in self.__sortedSchedules:
+                if i.data.get(category) >= start and startFound== False:
+                    head = i
+                    startFound = True
+                if i.data.get(category) > end:  
+                    if endNode is not None:
+                        endNode.next = None
+                    break
+                endNode = i
+            
+            self.__sortedSchedules = head
 
     def getResult(self) -> Node:
         return self.__sortedSchedules
@@ -591,9 +615,9 @@ class GUI(ttk.Window):
         self.loadPage.rowconfigure(0,weight=4)
         self.loadPage.rowconfigure(1,weight=4)
         self.loadPage.rowconfigure(2,weight=2)
-        self.loadPage.columnconfigure(0,weight=1)
+        self.loadPage.columnconfigure(0,weight=2)
         self.loadPage.columnconfigure(1,weight=3)
-        self.loadPage.columnconfigure(2,weight=1)
+        self.loadPage.columnconfigure(2,weight=2)
 
         # Predefining title and button styl
         titleFont = ("Arial", 40, "bold")
@@ -618,8 +642,8 @@ class GUI(ttk.Window):
         # Show on screen    
         self.loadPageLabel.grid(row=0,column=0, sticky="nwe", pady=(30,0), columnspan=3)
         self.openFolderButton.grid(row=0,column=1, sticky="s", pady=(0,10), ipady=1, ipadx=40)
-        self.fileTree.grid(row=1,column=1, sticky="nswe")
-        self.scrollbar.grid(row=1,column=2,sticky="wns")
+        self.fileTree.grid(row=1,column=1, sticky="ns")
+        self.scrollbar.grid(row=1,column=1,sticky="ens", padx=(0,33))
         self.fileTree.configure(yscrollcommand=self.scrollbar.set)
         self.deleteBtn.grid(row=2, column=1, sticky="n", pady=(5,0), padx=(100,0))
         self.clearBtn.grid(row=2, column=1, sticky="n", pady=(5,0), padx=(0,100))
@@ -632,13 +656,13 @@ class GUI(ttk.Window):
         self.fileTree.heading("indexNum", text="#", anchor="w")
         self.fileTree.heading("fileName", text="File Name", anchor="w")
         self.fileTree.column("indexNum", width=50, minwidth=50, stretch=tk.NO)
-        self.fileTree.column("fileName", width=10, minwidth=10)
+        self.fileTree.column("fileName", width=300, minwidth=300, stretch=tk.NO)
         
     def initViewPage(self):
         # Setting Page
         self.viewPage.grid(row=0, column=0, sticky="nswe")
-        self.viewPage.columnconfigure(0,weight=3)
-        self.viewPage.columnconfigure(1,weight=7)
+        self.viewPage.columnconfigure(0,weight=2)
+        self.viewPage.columnconfigure(1,weight=8)
         self.viewPage.rowconfigure(0,weight=1)
 
         # Split the screen in half
@@ -647,14 +671,13 @@ class GUI(ttk.Window):
 
         # Setting for the splitted screen
         self.filterFrame.grid(row=0,column=0,sticky="nswe")
-        self.filterFrame.grid_propagate(False)
         self.tableFrame.grid(row=0,column=1,sticky="nswe")
-        self.tableFrame.grid_propagate(False)
+        # self.tableFrame.grid_propagate(False)
 
 
-        self.filterFrame.columnconfigure(0,weight=1)
-        self.filterFrame.columnconfigure(1,weight=1)
-        self.filterFrame.columnconfigure(2,weight=1)
+        self.filterFrame.columnconfigure(0,weight=1, uniform='filter')
+        self.filterFrame.columnconfigure(1,weight=1, uniform='filter')
+        self.filterFrame.columnconfigure(2,weight=1, uniform='filter')
         self.filterFrame.rowconfigure(0,weight=1)
         self.filterFrame.rowconfigure(1,weight=1)
         self.filterFrame.rowconfigure(2,weight=1)
@@ -662,23 +685,24 @@ class GUI(ttk.Window):
         self.filterFrame.rowconfigure(4,weight=1)
         self.filterFrame.rowconfigure(5,weight=1)
         self.filterFrame.rowconfigure(6,weight=1)
+        self.filterFrame.rowconfigure(7,weight=1)
+        self.filterFrame.rowconfigure(8,weight=1)
+        self.filterFrame.rowconfigure(9,weight=1)
 
         self.tableFrame.columnconfigure(0, weight=1)
         self.tableFrame.rowconfigure(0, weight=1)
         self.tableFrame.rowconfigure(1, weight=5)
-        self.tableFrame.rowconfigure(2, weight=1)
         
 
         # Predefining
         titleFont = ("Arial", 20, "bold")
 
-
         # Table
         column = ["module", "moduleCode", "cohort", "course", "fullPart", "session", "activityDate", "scheduledDay", "startTime", "endTime", "duration","location","size","lecturer","zone"]
         self.scheduleViewer = ttk.Treeview(self.tableFrame, columns = column, show="headings", bootstyle="primary")
-        self.scheduleViewer.grid(row=1,column=0, padx=(10,21), sticky="nswe", ipadx=200)
+        self.scheduleViewer.grid(row=1,column=0, padx=(10,21),pady=(0,21), sticky="nswe")
         self.scheduleViewer.column("module", anchor="w", minwidth=150, width=10)
-        self.scheduleViewer.column("moduleCode", anchor="w", minwidth=70, width=10)
+        self.scheduleViewer.column("moduleCode", anchor="w", minwidth=100, width=10)
         self.scheduleViewer.column("cohort", anchor="w", minwidth=60, width=10)
         self.scheduleViewer.column("course", anchor="w", minwidth=100, width=10)
         self.scheduleViewer.column("fullPart", anchor="w", minwidth=70, width=10)
@@ -711,18 +735,29 @@ class GUI(ttk.Window):
 
         self.scheduleScrollVerBar = ttk.Scrollbar(self.tableFrame, orient="vertical",command=self.scheduleViewer.yview)
         self.scheduleScrollHorBar = ttk.Scrollbar(self.tableFrame, orient="horizontal",command=self.scheduleViewer.xview)
-        self.scheduleScrollVerBar.grid(row=1,column=0,sticky="ens",padx=(0,10))
-        self.scheduleScrollHorBar.grid(row=1,column=0,sticky="wes", padx=(10,10))
+        self.scheduleScrollVerBar.grid(row=1,column=0,sticky="ens",padx=(0,10),pady=(0,21))
+        self.scheduleScrollHorBar.grid(row=1,column=0,sticky="wes", padx=(10,10),pady=(0,10))
         self.scheduleViewer.configure(yscrollcommand=self.scheduleScrollVerBar.set)
         self.scheduleViewer.configure(xscrollcommand=self.scheduleScrollHorBar.set)
-        
-
+ 
         # Specific Setting
-        self.filterLabel = ttk.Label(self.filterFrame, text="Filter Schedules", font=titleFont, bootstyle="inverse-light")
-        self.backLoadButton = ttk.Button(self.filterFrame, text="Back", bootstyle="success",command=lambda:[self.showPage(self.loadPage)])
-        self.resetSchedulesButton = ttk.Button(self.filterFrame, text="Reset", bootstyle="success",command=lambda:[self.displayHandler.restoreSortedSchedules(), self.displaySchedules(),self.dataHandler.setRange(self.displayHandler.getResult()),self.updateOptions()])
         menuButtonStyle = ttk.Style()
-        menuButtonStyle.configure("new.primary.Outline.TMenubutton", font=("Arial",15, "bold"))
+        menuButtonStyle.configure("new.primary.Outline.TMenubutton", font=("Arial",13, "bold"))
+        resetButton = ttk.Style()
+        resetButton.configure("reset.danger.Outline.TButton", font=("Arial",10))
+        self.filterLabel = ttk.Label(self.filterFrame, text="Filter Schedules", font=titleFont, bootstyle="inverse-light")
+        self.RangeLabel = ttk.Label(self.filterFrame, text="Range Schedules", font=titleFont, bootstyle="inverse-light")
+    
+        self.startDate = ttk.DateEntry(self.filterFrame, width=8, dateformat="%d-%m-%Y")
+        self.endDate = ttk.DateEntry(self.filterFrame, width=8, dateformat="%d-%m-%Y")
+        self.applyDateButton = ttk.Button(self.filterFrame, text="Apply Date", bootstyle="primary-Outline",command=lambda:[self.queryFilterDateTime("date",self.startDate.entry.get(),self.endDate.entry.get())])
+        self.applyTimeButton = ttk.Button(self.filterFrame, text="Apply Time", bootstyle="primary-Outline",command=lambda:[self.queryFilterDateTime("time",self.startTimeEntry.get(),self.endTimeEntry.get())])
+        self.startTimeEntry = ttk.Entry(self.filterFrame, width=13)
+        self.endTimeEntry = ttk.Entry(self.filterFrame, width=13)
+        self.backLoadButton = ttk.Button(self.filterFrame, text="Back", bootstyle="primary",command=lambda:[self.showPage(self.loadPage)])
+        self.scheduleLabel = ttk.Label(self.tableFrame, text="Schedules", font=titleFont)
+        self.resetSchedulesButton = ttk.Button(self.filterFrame, text="Reset", style="reset.danger.Outline.TButton",command=lambda:[self.showPage(self.viewPage)])
+        self.exportButton = ttk.Button(self.filterFrame, text="Export", bootstyle="primary", command=lambda:[mb.show_error("You chose a folder with no CSV files\nPlease choose a folder with CSV files", "No Files Error")])
 
         # Menubuttons
         self.moduleMenu = ttk.Menubutton(self.filterFrame, style="new.primary.Outline.TMenubutton", text="Module")
@@ -740,12 +775,33 @@ class GUI(ttk.Window):
         self.sizeMenu = ttk.Menubutton(self.filterFrame, style="new.primary.Outline.TMenubutton", text="Size")
         self.lecturerMenu = ttk.Menubutton(self.filterFrame, style="new.primary.Outline.TMenubutton", text="Lecturer")
         self.zoneMenu = ttk.Menubutton(self.filterFrame, style="new.primary.Outline.TMenubutton", text="Zone")
-        
+
+        # Sort By Button
+        self.sortIn = tk.BooleanVar()
+        self.ascButton = ttk.Radiobutton(self.tableFrame, variable=self.sortIn, text="Ascending", value=True)
+        self.desButton = ttk.Radiobutton(self.tableFrame, variable=self.sortIn, text="Descending", value=False)
+        self.sortByMenu = ttk.Menubutton(self.tableFrame, style="new.primary.Outline.TMenubutton", text="Sort By")
+        self.sortByVar = tk.StringVar()
+        sortByOptions = ttk.Menu(self.sortByMenu)
+        for x in ["Module","Module Code","Cohort","Course","Full/Part","Session","Date","Day","Start Time","End Time","Duration","Location","Size","Lecturer","Zone"]:
+            sortByOptions.add_radiobutton(label=x, variable=self.sortByVar, command=lambda x=x:self.selectedValue("sortBy",x,self.sortIn.get()))
+        self.sortByMenu['menu'] = sortByOptions
+
+        self.ascButton.invoke()
 
         # Show on screen
-        self.filterLabel.grid(row=0, column=0,columnspan=3)
-        self.backLoadButton.grid(row=6, column=0, sticky="s", pady=(0,10), padx=(0,0), ipadx=20, ipady=5)
-        self.resetSchedulesButton.grid(row=6, column=2, sticky="s", pady=(0,10), padx=(0,0), ipadx=20, ipady=5)
+        self.filterLabel.grid(row=0, column=0,columnspan=3, sticky="w", padx=(10,0))
+        self.RangeLabel.grid(row=6,column=0,columnspan=3,sticky="w",padx=(10,0))
+        self.scheduleLabel.grid(row=0, column=0, sticky="w",padx=(10,0))
+        self.startDate.grid(row=7,column=0, ipadx=10)
+        self.endDate.grid(row=7,column=1, ipadx=10)
+        self.applyDateButton.grid(row=7,column=2)
+        self.startTimeEntry.grid(row=8,column=0)
+        self.endTimeEntry.grid(row=8,column=1)
+        self.applyTimeButton.grid(row=8,column=2)
+        self.backLoadButton.grid(row=9, column=0, sticky="s", pady=(0,10), padx=(0,0), ipadx=20, ipady=5)
+        self.resetSchedulesButton.grid(row=9, column=1, sticky="s", pady=(0,15), padx=40, ipadx=20, ipady=1)
+        self.exportButton.grid(row=9,column=2,stick="s", pady=(0,10), padx=(0,0), ipadx=20, ipady=5)
         self.moduleMenu.grid(row=1,column=0,sticky="we",padx=10)
         self.moduleCodeMenu.grid(row=1,column=1,sticky="we",padx=10)
         self.cohortMenu.grid(row=1,column=2,sticky="we",padx=10)
@@ -761,23 +817,56 @@ class GUI(ttk.Window):
         self.lecturerMenu.grid(row=5,column=0,sticky="we",padx=10)
         self.sizeMenu.grid(row=5,column=1,sticky="we",padx=10)
         self.zoneMenu.grid(row=5,column=2,sticky="we",padx=10)
+        self.sortByMenu.grid(row=0,column=0,sticky="e",padx=(0,21),pady=(0,0))
+        self.ascButton.grid(row=0,column=0,padx=(0,250), sticky="e")
+        self.desButton.grid(row=0,column=0,padx=(0,150), sticky="e")
 
+    def selectedValue(self, category, value, isASC = True):
+        if category == "sortBy":
+            newCategory = {
+                "Module" : "module",
+                "Module Code" : "moduleCode",
+                "Cohort" : "cohort",
+                "Course" : "course",
+                "Full/Part" : "fullPart",
+                "Session" : "session",
+                "Date" : "activityDate",
+                "Day" : "scheduledDay",
+                "Start Time" : "startTime",
+                "End Time" : "endTime",
+                "Duration" : "duration",
+                "Location" : "location",
+                "Size" : "size",
+                "Lecturer" : "lecturer",
+                "Zone" : "zone",
+            }[value]
+            self.displayHandler.sort(newCategory, isASC)
+            pass
+        else:
+            self.displayHandler.commonSchedules(self.displayHandler.filterSchedule(category,value))
+            self.dataHandler.setRange(self.displayHandler.getResult())
         
 
-    def selectedValue(self, category, value):
-        self.displayHandler.commonSchedules(self.displayHandler.filterSchedule(category,value))
-        
-        # Post-Filtering
-        self.dataHandler.setRange(self.displayHandler.getResult())
+        # Post Filtering or Sorting
         self.displaySchedules()
         self.updateOptions()
 
     def updateOptions(self):
+        disabledButtonStyle = ttk.Style()
+        disabledButtonStyle.configure("dis.dark.TMenubutton", font=("Arial",13, "bold"))
+        enabledButtonStyle = ttk.Style()
+        enabledButtonStyle.configure("en.primary.Outline.TMenubutton", font=("Arial",13, "bold"))
+
         moduleOptions = ttk.Menu(self.moduleMenu)
         self.moduleVar = tk.StringVar()
         for x in self.insertionSort(self.dataHandler.getRange("module")):
             moduleOptions.add_radiobutton(label=x, variable=self.moduleVar, command=lambda x=x:self.selectedValue("module",x))
         self.moduleMenu['menu'] = moduleOptions
+
+        if len(self.dataHandler.getRange("module")) <= 1:
+            self.moduleMenu.configure(style="dis.dark.TMenubutton")
+        else:
+            self.moduleMenu.configure(style="en.primary.Outline.TMenubutton")
 
         moduleCodeOptions = ttk.Menu(self.moduleCodeMenu)
         self.moduleCodeVar = tk.StringVar()
@@ -785,11 +874,21 @@ class GUI(ttk.Window):
             moduleCodeOptions.add_radiobutton(label=x, variable=self.moduleCodeVar, command=lambda x=x:self.selectedValue("moduleCode",x))
         self.moduleCodeMenu['menu'] = moduleCodeOptions
 
+        if len(self.dataHandler.getRange("moduleCode")) <= 1:
+            self.moduleCodeMenu.configure(style="dis.dark.TMenubutton")
+        else:
+            self.moduleCodeMenu.configure(style="en.primary.Outline.TMenubutton")
+
         cohortOptions = ttk.Menu(self.cohortMenu)
         self.cohortVar = tk.StringVar()
         for x in self.insertionSort(self.dataHandler.getRange("cohort")):
             cohortOptions.add_radiobutton(label=x, variable=self.cohortVar, command=lambda x=x:self.selectedValue("cohort",x))
         self.cohortMenu['menu'] = cohortOptions
+
+        if len(self.dataHandler.getRange("cohort")) <= 1:
+            self.cohortMenu.configure(style="dis.dark.TMenubutton")
+        else:
+            self.cohortMenu.configure(style="en.primary.Outline.TMenubutton")
 
         courseOptions = ttk.Menu(self.courseMenu)
         self.courseVar = tk.StringVar()
@@ -797,11 +896,21 @@ class GUI(ttk.Window):
             courseOptions.add_radiobutton(label=x, variable=self.courseVar, command=lambda x=x:self.selectedValue("course",x))
         self.courseMenu['menu'] = courseOptions
 
+        if len(self.dataHandler.getRange("course")) <= 1:
+            self.courseMenu.configure(style="dis.dark.TMenubutton")
+        else:
+            self.courseMenu.configure(style="en.primary.Outline.TMenubutton")
+
         fullPartOptions = ttk.Menu(self.fullPartMenu)
         self.fullPartVar = tk.StringVar()
         for x in self.insertionSort(self.dataHandler.getRange("fullPart")):
             fullPartOptions.add_radiobutton(label=x, variable=self.fullPartVar, command=lambda x=x:self.selectedValue("fullPart",x))
         self.fullPartMenu['menu'] = fullPartOptions
+
+        if len(self.dataHandler.getRange("fullPart")) <= 1:
+            self.fullPartMenu.configure(style="dis.dark.TMenubutton")
+        else:
+            self.fullPartMenu.configure(style="en.primary.Outline.TMenubutton")
 
         sessionOptions = ttk.Menu(self.sessionMenu)
         self.sessionVar = tk.StringVar()
@@ -809,11 +918,21 @@ class GUI(ttk.Window):
             sessionOptions.add_radiobutton(label=x, variable=self.sessionVar, command=lambda x=x:self.selectedValue("session",x))
         self.sessionMenu['menu'] = sessionOptions
 
+        if len(self.dataHandler.getRange("session")) <= 1:
+            self.sessionMenu.configure(style="dis.dark.TMenubutton")
+        else:
+            self.sessionMenu.configure(style="en.primary.Outline.TMenubutton")
+
         activityDateOptions = ttk.Menu(self.activityDateMenu)
         self.activityDateVar = tk.StringVar()
         for x in self.insertionSort(self.dataHandler.getRange("activityDate")):
             activityDateOptions.add_radiobutton(label=x, variable=self.activityDateVar, command=lambda x=x:self.selectedValue("activityDate",x))
         self.activityDateMenu['menu'] = activityDateOptions
+
+        if len(self.dataHandler.getRange("activityDate")) <= 1:
+            self.activityDateMenu.configure(style="dis.dark.TMenubutton")
+        else:
+            self.activityDateMenu.configure(style="en.primary.Outline.TMenubutton")
 
         day = ["", "Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
         scheduledDayOptions = ttk.Menu(self.scheduledDayMenu)
@@ -822,11 +941,21 @@ class GUI(ttk.Window):
             scheduledDayOptions.add_radiobutton(label=day[x], variable=self.scheduledDayVar, command=lambda x=x:self.selectedValue("scheduledDay",x))
         self.scheduledDayMenu['menu'] = scheduledDayOptions
 
+        if len(self.dataHandler.getRange("scheduledDay")) <= 1:
+            self.scheduledDayMenu.configure(style="dis.dark.TMenubutton")
+        else:
+            self.scheduledDayMenu.configure(style="en.primary.Outline.TMenubutton")
+
         startTimeOptions = ttk.Menu(self.startTimeMenu)
         self.startTimeVar = tk.StringVar()
         for x in self.insertionSort(self.dataHandler.getRange("startTime")):
             startTimeOptions.add_radiobutton(label=x, variable=self.startTimeVar, command=lambda x=x:self.selectedValue("startTime",x))
         self.startTimeMenu['menu'] = startTimeOptions
+
+        if len(self.dataHandler.getRange("startTime")) <= 1:
+            self.startTimeMenu.configure(style="dis.dark.TMenubutton")
+        else:
+            self.startTimeMenu.configure(style="en.primary.Outline.TMenubutton")
 
         endTimeOptions = ttk.Menu(self.endTimeMenu)
         self.endTimeVar = tk.StringVar()
@@ -834,11 +963,21 @@ class GUI(ttk.Window):
             endTimeOptions.add_radiobutton(label=x, variable=self.endTimeVar, command=lambda x=x:self.selectedValue("endTime",x))
         self.endTimeMenu['menu'] = endTimeOptions
 
+        if len(self.dataHandler.getRange("endTime")) <= 1:
+            self.endTimeMenu.configure(style="dis.dark.TMenubutton")
+        else:
+            self.endTimeMenu.configure(style="en.primary.Outline.TMenubutton")
+
         durationOptions = ttk.Menu(self.durationMenu)
         self.durationVar = tk.StringVar()
         for x in self.insertionSort(self.dataHandler.getRange("duration")):
             durationOptions.add_radiobutton(label=x, variable=self.durationVar, command=lambda x=x:self.selectedValue("duration",x))
         self.durationMenu['menu'] = durationOptions
+        
+        if len(self.dataHandler.getRange("duration")) <= 1:
+            self.durationMenu.configure(style="dis.dark.TMenubutton")
+        else:
+            self.durationMenu.configure(style="en.primary.Outline.TMenubutton")
 
         locationOptions = ttk.Menu(self.locationMenu)
         self.locationVar = tk.StringVar()
@@ -846,11 +985,21 @@ class GUI(ttk.Window):
             locationOptions.add_radiobutton(label=x, variable=self.locationVar, command=lambda x=x:self.selectedValue("location",x))
         self.locationMenu['menu'] = locationOptions
 
+        if len(self.dataHandler.getRange("location")) <= 1:
+            self.locationMenu.configure(style="dis.dark.TMenubutton")
+        else:
+            self.locationMenu.configure(style="en.primary.Outline.TMenubutton")
+
         sizeOptions = ttk.Menu(self.sizeMenu)
         self.sizeVar = tk.StringVar()
         for x in self.insertionSort(self.dataHandler.getRange("size")):
             sizeOptions.add_radiobutton(label=x, variable=self.sizeVar, command=lambda x=x:self.selectedValue("size",x))
         self.sizeMenu['menu'] = sizeOptions
+
+        if len(self.dataHandler.getRange("size")) <= 1:
+            self.sizeMenu.configure(style="dis.dark.TMenubutton")
+        else:
+            self.sizeMenu.configure(style="en.primary.Outline.TMenubutton")
 
         lecturerOptions = ttk.Menu(self.lecturerMenu)
         self.lecturerVar = tk.StringVar()
@@ -858,15 +1007,37 @@ class GUI(ttk.Window):
             lecturerOptions.add_radiobutton(label=x, variable=self.lecturerVar, command=lambda x=x:self.selectedValue("lecturer",x))
         self.lecturerMenu['menu'] = lecturerOptions
 
+        if len(self.dataHandler.getRange("lecturer")) <= 1:
+            self.lecturerMenu.configure(style="dis.dark.TMenubutton")
+        else:
+            self.lecturerMenu.configure(style="en.primary.Outline.TMenubutton")
+
         zoneOptions = ttk.Menu(self.zoneMenu)
         self.zoneVar = tk.StringVar()
         for x in self.insertionSort(self.dataHandler.getRange("zone")):
             zoneOptions.add_radiobutton(label=x, variable=self.zoneVar, command=lambda x=x:self.selectedValue("zone",x))
         self.zoneMenu['menu'] = zoneOptions
 
+        if len(self.dataHandler.getRange("zone")) <= 1:
+            self.zoneMenu.configure(style="dis.dark.TMenubutton")
+        else:
+            self.zoneMenu.configure(style="en.primary.Outline.TMenubutton")
 
-        # moduleCodeOptions = ttk.Menu(self.moduleCodeMenu)
-        # self.moduleCodeVar = tk.StringVar()
+    def queryFilterDateTime(self, category, start, end):
+        if category == "date":
+            dateformat = "%d-%m-%Y"
+            start = datetime.datetime.strptime(f"{start}",dateformat).date()
+            end = datetime.datetime.strptime(f"{end}",dateformat).date()
+            self.displayHandler.rangeSearch(start,end,"activityDate")
+        elif category == "time":
+            dateformat = "%H:%M"
+            start = datetime.datetime.strptime(f"{start}",dateformat).time()
+            end = datetime.datetime.strptime(f"{end}",dateformat).time()
+            self.displayHandler.rangeSearch(start,end,"time")
+
+        self.displaySchedules()
+        self.updateOptions()
+            
         
     def queryFolderPath(self):
         folderPath = fd.askdirectory()
@@ -959,33 +1130,7 @@ class GUI(ttk.Window):
             newList[pointer] = value
 
         return newList
+
+
 # MAIN ====================
-
 a = GUI()
-
-
-
-
-# Initializing Display Option Handler Class
-# displayHandler = DisplayHandler(dataHandler.getSchedules(), dataHandler.getRangeList())
-
-# displayHandler.filterSchedule("moduleCode", "DCNG")
-
-# displayHandler.sort("activityDate", True)
-
-# a =0
-# for i in displayHandler.getResult():
-#     print(i.data.getAll())
-#     a+=1
-# print(a)
-
-# print("============")
-# displayHandler.sort("module")
-
-
-
-
-
-print("============")
-
-
