@@ -454,21 +454,22 @@ class DisplayHandler:
         self.__sortedSchedules = self.__mergeSort(head, category)
 
         # For Descending Order
-        if isAscending == False:
-            stack = Stack()
+        if self.__sortedSchedules is not None:
+            if isAscending == False:
+                stack = Stack()
 
-            for i in self.__sortedSchedules:
-                stack.push(i)
+                for i in self.__sortedSchedules:
+                    stack.push(i)
 
-            newHead = currentNode = stack.pop()
+                newHead = currentNode = stack.pop()
 
-            while not stack.isEmpty():
-                currentNode.next = stack.pop()
-                currentNode = currentNode.next
+                while not stack.isEmpty():
+                    currentNode.next = stack.pop()
+                    currentNode = currentNode.next
 
-            currentNode.next = None
+                currentNode.next = None
 
-            self.__sortedSchedules = newHead
+                self.__sortedSchedules = newHead
 
     def setCommonSchedules(self, filteredSchedules:Node) -> Node:
         # Used for multiple filtering and range sort features
@@ -773,10 +774,10 @@ class GUI(ttk.Window):
 
         # Sort By buttons setting
         self.__sortIn = tk.BooleanVar()
-        self.__ascButton = ttk.Radiobutton(self.__tableFrame, variable=self.__sortIn, text="Ascending", value=True)
-        self.__desButton = ttk.Radiobutton(self.__tableFrame, variable=self.__sortIn, text="Descending", value=False)
+        self.__sortBySelection = "Module"
+        self.__ascButton = ttk.Radiobutton(self.__tableFrame, variable=self.__sortIn, text="Ascending", value=True, command=lambda:[self.__selectedValue("sortBy",self.__sortBySelection,True)])
+        self.__desButton = ttk.Radiobutton(self.__tableFrame, variable=self.__sortIn, text="Descending", value=False, command=lambda:[self.__selectedValue("sortBy",self.__sortBySelection,False)])
         self.__sortByMenu = ttk.Menubutton(self.__tableFrame, style="new.primary.Outline.TMenubutton", text="Sort By")
-        self.__ascButton.invoke()
 
         # Setting table headings
         self.__sortByVar = tk.StringVar()
@@ -837,6 +838,7 @@ class GUI(ttk.Window):
                 "Lecturer" : "lecturer",
                 "Zone" : "zone",
             }[value]
+            self.__sortBySelection = value
             self.__displayHandler.sort(newCategory, isASC)
         else:
             self.__displayHandler.setCommonSchedules(self.__displayHandler.getFilteredSchedule(category,value))
@@ -1112,6 +1114,7 @@ class GUI(ttk.Window):
             self.geometry("1500x500+100+250")
             self.__dataHandler.setSchedules()
             self.__displayHandler = DisplayHandler(self.__dataHandler.getSchedules(), self.__dataHandler.getRangeList())
+            self.__ascButton.invoke()
             self.__updateOptions()
             self.__displaySchedules()
         else:
