@@ -1,11 +1,29 @@
-import os, csv
-import math
-import datetime
+# ===== Import =====
+# GUI Class
+import os, csv # For reading data
+import tkinter as tk # For GUI Feature
+import ttkbootstrap as ttk # For modern tkinter GUI
+from ttkbootstrap.dialogs import Messagebox as mb # For error message
+from tkinter import filedialog as fd # For file directory
 
-import tkinter as tk
-import ttkbootstrap as ttk
-from ttkbootstrap.dialogs import Messagebox as mb
-from tkinter import filedialog as fd
+# Data Handler Class and Display Handler Class
+import math # For hashtable size
+import datetime # For date and time in the schedule
+
+# Export Handler Class
+import random # For random color generator
+import colorsys # For erandom color generator
+from openpyxl import Workbook # For editting Excel
+from openpyxl.utils import get_column_letter # # For changing index number to column letter
+from openpyxl.styles import Font, Alignment, Border, Side, PatternFill # For editting components of Excel
+
+"""
+Module Download Requirements:
+    1. tkinter
+    2. ttkbootstrap
+    3. openpyxl
+"""
+
 
 
 # ===== Custom Data Structures =====
@@ -488,6 +506,13 @@ class DisplayHandler:
 
         self.__sortedSchedules = resultLinkedList.head
 
+    def exportResult(self):
+        # Result specifically for export as it requires "sort by date"
+        newLinkedList = LinkedList()
+        for i in self.__sortedSchedules:
+            newLinkedList.append(i.data)
+        return self.__mergeSort(newLinkedList.head,"activityDate")
+
     def __mergeSort(self, head:Node, category:str) -> Node:
         if head is None or head.next is None:
             return head
@@ -539,11 +564,294 @@ class DisplayHandler:
 
 
 
+class ExportHandler:
+    def __init__(self):
+        self.__result = LinkedList()
+        self.__startingRow = 12
+        self.__weekCnt = 1
+        self.__minDate = datetime.date(3000,1,1)
+        self.__maxDate = datetime.date(1000,1,1)
+        self.__groupedModules = {}
+        self.__path = ""
+
+    def setResult(self, result:LinkedList, path:str):
+        self.__result = result
+        self.__path = path
+
+    def exportExcel(self):
+        # Reset all data before exporting
+        # self.__resetData()
+
+        # Reset values for repeated process
+        self.__startingRow = 12
+        self.__weekCnt = 1
+        self.__minDate = datetime.date(3000,1,1)
+        self.__maxDate = datetime.date(1000,1,1)
+        self.__groupedModules = {}
+
+        # Border width predefine
+        self.__thick = Side(border_style="medium")
+        self.__thin = Side(border_style="thin",color="808080")
+        self.__getHeaderData()
+
+        wb = Workbook()
+        ws = wb.active
+
+        # First Row with small width
+        ws.column_dimensions['A'].width = 5
+
+        # Default Row width
+        col = 2
+        while col < 10:
+            i = get_column_letter(col)
+            ws.column_dimensions[i].width = 30
+            col += 1
+
+        # PSB logo
+        ws.merge_cells('B4:B7')
+        ws['B4'].font = Font(size=76,color="902108",name='Times New Roman', bold=True)
+        ws['B4'].alignment = Alignment(horizontal="center",vertical="center")
+        ws['B4'] = "PSB"
+
+        # ACADEMY logo
+        ws.row_dimensions[8].height = 20
+        ws.row_dimensions[9].height = 20
+        ws.merge_cells('B8:B9')
+        ws['B8'].font = Font(size=36,color="7F7F7F",name='Calibri', bold=True)
+        ws['B8'].alignment = Alignment(horizontal="center",vertical="center")
+        ws['B8'] = "Academy"
+
+        # Grouped Module list header
+        ws.merge_cells('D4:E4')
+        ws['D4'].alignment = Alignment(horizontal="left",vertical="center")
+        ws['D4'] = "Module"
+        ws['F4'] = "Cohort"
+        ws['G4'] = "Lecturer"
+        ws['H4'] = "Full-time / Part-time"
+        ws['I4'] = "Date Start - Date End"
+
+        ws['D4'].border = Border(left=self.__thick,top=self.__thick,bottom=self.__thick)
+        ws['E4'].border = Border(top=self.__thick,bottom=self.__thick,right=self.__thin)
+        ws['F4'].border = Border(top=self.__thick,bottom=self.__thick,right=self.__thin)
+        ws['G4'].border = Border(top=self.__thick,bottom=self.__thick,right=self.__thin)
+        ws['H4'].border = Border(top=self.__thick,bottom=self.__thick,right=self.__thin)
+        ws['I4'].border = Border(top=self.__thick,bottom=self.__thick,right=self.__thick)
+
+        ws['D4'].fill = PatternFill("solid", start_color="AACDFF")
+        ws['F4'].fill = PatternFill("solid", start_color="AACDFF")
+        ws['G4'].fill = PatternFill("solid", start_color="AACDFF")
+        ws['H4'].fill = PatternFill("solid", start_color="AACDFF")
+        ws['I4'].fill = PatternFill("solid", start_color="AACDFF")
+
+        # Grouped Module Data Insert
+        i = 5
+        for _, value in self.__groupedModules.items():
+            module, cohort, lecturer, fullPart = value[0], value[1], value[2], value[3]
+            ws.merge_cells('D'+str(i)+':'+"E"+str(i))
+            ws["D" + str(i)] = module
+            ws["F" + str(i)] = cohort
+            ws["G" + str(i)] = lecturer
+            ws["H" + str(i)] = fullPart
+            ws["D" + str(i)].fill = PatternFill("solid", start_color=value[4])
+
+            ws["D" + str(i)].border = Border(left=self.__thick,bottom=self.__thin)
+            ws["E" + str(i)].border = Border(bottom=self.__thin,right=self.__thin)
+            ws["F" + str(i)].border = Border(bottom=self.__thin,right=self.__thin)
+            ws["G" + str(i)].border = Border(bottom=self.__thin,right=self.__thin)
+            ws["H" + str(i)].border = Border(bottom=self.__thin,right=self.__thin)
+            ws["I" + str(i)].border = Border(bottom=self.__thin,right=self.__thick)
+            if len(self.__groupedModules.items())-1 == i-5:
+                ws["D" + str(i)].border = Border(left=self.__thick,bottom=self.__thick)
+                ws["E" + str(i)].border = Border(bottom=self.__thick,right=self.__thin)
+                ws["F" + str(i)].border = Border(bottom=self.__thick,right=self.__thin)
+                ws["G" + str(i)].border = Border(bottom=self.__thick,right=self.__thin)
+                ws["H" + str(i)].border = Border(bottom=self.__thick,right=self.__thin)
+                ws["I" + str(i)].border = Border(bottom=self.__thick,right=self.__thick)
+            ws.row_dimensions[i].height = 20
+            i+=1
+
+        # Define the Starting row
+        self.__startingRow = 12
+        if len(self.__groupedModules.items()) > 5:
+            self.__startingRow += len(self.__groupedModules.items())-4
+
+        # Build Main Schedule table
+        self.currentDate = self.__minDate
+        self.weekStartMarked = False
+        self.__createHeading(ws)
+        self.__createRow(ws)
+        moduleRow = self.__startingRow
+        createdRow = 1
+        stream = 1
+        prevDate = self.__minDate - datetime.timedelta(days=1)
+
+        # Insert schedules
+        for schedule in self.__result:
+            date = schedule.data.get("activityDate")
+            # if new heading has to be created
+            while date >= self.currentDate:
+                date = schedule.data.get("activityDate")
+                self.__createHeading(ws)
+                self.__createRow(ws)
+                moduleRow = self.__startingRow
+                createdRow = 1
+                stream = 1
+
+            # if the schedule is the first to go in the date
+            if date != prevDate:
+                stream = 1
+                insertingCell = get_column_letter(date.isoweekday()+2) + str(moduleRow - 6)
+                ws[insertingCell] = schedule.data.get("moduleCode") + " (" + schedule.data.get("fullPart")+")"
+                ws[insertingCell].fill = PatternFill("solid", start_color=self.__groupedModules[f"{schedule.data.get('module')}{schedule.data.get('cohort')}{schedule.data.get('lecturer')}{schedule.data.get('fullPart')}"][4])
+                ws[get_column_letter(date.isoweekday()+2) + str(moduleRow - 5)] = str(schedule.data.get("startTime"))[:-3] + " ~ " + str(schedule.data.get("endTime"))[:-3]
+                ws[get_column_letter(date.isoweekday()+2) + str(moduleRow - 4)] = self.__characterLimit(schedule.data.get("lecturer"))
+                ws[get_column_letter(date.isoweekday()+2) + str(moduleRow - 3)] = schedule.data.get("location")
+                ws[get_column_letter(date.isoweekday()+2) + str(moduleRow - 2)] = schedule.data.get("size")
+                ws[get_column_letter(date.isoweekday()+2) + str(moduleRow - 1)] = schedule.data.get("zone")
+            
+            # If the schedule has to go to second ~ # rows
+            else:
+                stream += 1
+                # If I need to create a new row for new data
+                if createdRow < stream:
+                    self.__createRow(ws)
+                    createdRow += 1
+                # Insert schedule
+                insertingCell = get_column_letter(date.isoweekday()+2) + str(moduleRow - 12 + (stream*6))
+                ws[insertingCell] = schedule.data.get("moduleCode") + " (" + schedule.data.get("fullPart")+")"
+                ws[insertingCell].fill = PatternFill("solid", start_color=self.__groupedModules[f"{schedule.data.get('module')}{schedule.data.get('cohort')}{schedule.data.get('lecturer')}{schedule.data.get('fullPart')}"][4])
+                ws[get_column_letter(date.isoweekday()+2) + str(moduleRow - 12 + (stream*6)+1)] = str(schedule.data.get("startTime"))[:-3] + " ~ " + str(schedule.data.get("endTime"))[:-3]
+                ws[get_column_letter(date.isoweekday()+2) + str(moduleRow - 12 + (stream*6)+2)] = self.__characterLimit(schedule.data.get("lecturer"))
+                ws[get_column_letter(date.isoweekday()+2) + str(moduleRow - 12 + (stream*6)+3)] = schedule.data.get("location")
+                ws[get_column_letter(date.isoweekday()+2) + str(moduleRow - 12 + (stream*6)+4)] = schedule.data.get("size")
+                ws[get_column_letter(date.isoweekday()+2) + str(moduleRow - 12 + (stream*6)+5)] = schedule.data.get("zone")
+            prevDate = date
+
+
+        # Remove the frid lines and headers in Excel for clean view
+        ws.sheet_view.showGridLines = False
+        ws.sheet_view.showRowColHeaders = False
+
+        wb.save(self.__path+"/Excel_Timetable.xlsx")
+
+    def __getHeaderData(self): # Used for finding the grouped schedules
+        groupingSchedule = {}
+        for i in self.__result:
+            strVal = f"{i.data.get('module')}{i.data.get('cohort')}{i.data.get('lecturer')}{i.data.get('fullPart')}"
+            groupingSchedule.update({strVal:[i.data.get('module')+' '+i.data.get('moduleCode'),i.data.get('cohort'),i.data.get('lecturer'),i.data.get('fullPart'),self.__generateRandomColor()]})
+            if i.data.get("activityDate") < self.__minDate: self.__minDate = i.data.get("activityDate")
+            if i.data.get("activityDate") > self.__maxDate: self.__maxDate = i.data.get("activityDate")
+
+        self.__groupedModules = groupingSchedule
+    
+    def __createHeading(self, ws): # Used for creating heading with days and dates
+        # 
+        headingFont = Font(size=14, bold=True, underline="single")
+        days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        for i in range(8):
+            currentColumnLetter = get_column_letter(i+2)
+            currentCell = currentColumnLetter + str(self.__startingRow)
+            bottomCell = currentColumnLetter + str(self.__startingRow+1)
+            
+            # For the Week columns
+            if currentColumnLetter == "B":
+                ws.merge_cells('B' + str(self.__startingRow)+':'+'B'+ str(self.__startingRow+1))
+                ws[currentCell] = "Week" + str(self.__weekCnt)
+                ws[currentCell].border = Border(left=self.__thick, top=self.__thick,right=self.__thick)
+                ws[bottomCell].border = Border(left=self.__thick, bottom=self.__thick, right=self.__thick)
+
+            # For the Days and date columns
+            else:
+                currentCell = currentColumnLetter + str(self.__startingRow)
+                ws[currentCell] = days[i-1]
+                ws[currentCell].border = Border(top=self.__thick,right=self.__thin)
+                ws[bottomCell].border = Border(bottom=self.__thick, right=self.__thin)
+                if currentColumnLetter == "I":
+                    ws[currentCell].border = Border(top=self.__thick,right=self.__thick)
+                    ws[bottomCell].border = Border(bottom=self.__thick,right=self.__thick)
+                
+
+            # Font and color on all cells
+            ws[currentCell].font = headingFont
+            ws[currentCell].fill = PatternFill("solid", start_color="AACDFF")
+            ws[bottomCell].fill = PatternFill("solid", start_color="AACDFF")
+            ws[currentCell].alignment = Alignment(horizontal="center",vertical="center")
+            ws[bottomCell].alignment = Alignment(horizontal="center",vertical="center")
+        
+        # Entering Date
+        
+        for i in range(7):
+            currentColumnLetter = get_column_letter(i+3)
+            currentCell = currentColumnLetter + str(self.__startingRow+1)
+            if self.__weekCnt == 1 and not self.weekStartMarked:
+                if self.currentDate.isoweekday() == i+1:
+                    ws[currentCell] = self.currentDate
+                    self.weekStartMarked = True
+                
+            # If start has marked
+            else:
+                ws[currentCell] = self.currentDate
+
+            if self.weekStartMarked == True:
+                self.currentDate += datetime.timedelta(days=1)
+
+        self.__weekCnt += 1
+        self.__startingRow += 2
+
+    def __createRow(self,ws): # Used for creating empty schedules row frame
+        detailList = ["Module", "Time", "Lecturer", "Location", "Size", "Zone"]
+        ws.row_dimensions[self.__startingRow].height = 70
+        # Left Column border and data setting
+        for i in range(6):
+            currentCell = "B" + str(i + self.__startingRow)
+            ws[currentCell] = detailList[i]
+            ws[currentCell].fill = PatternFill("solid", start_color="AACDFF")
+            ws[currentCell].font = Font(bold = True, size=14)
+            ws[currentCell].alignment = Alignment(horizontal="center",vertical="center")
+            ws[currentCell].border = Border(bottom=self.__thin,right=self.__thick,left=self.__thick)
+
+        ws["B" + str(5 + self.__startingRow)].border = Border(bottom=self.__thick,right=self.__thick,left=self.__thick)
+
+        # Setting the font and border for the actual values
+        for i in range(7):
+            for j in range(6):
+                currentColumnLetter = get_column_letter(i+3)
+                currentCell = currentColumnLetter + str(j+self.__startingRow)
+                ws[currentCell].font = Font(size=14)
+                ws[currentCell].border = Border(bottom=self.__thin,right=self.__thin)
+                ws[currentCell].alignment = Alignment(horizontal="center",vertical="center")
+                if j == 5:
+                    ws[currentCell].border = Border(bottom=self.__thick,right=self.__thin)
+                if i == 6:
+                    ws[currentCell].border = Border(bottom=self.__thin,right=self.__thick)
+                if j == 5 and i == 6:
+                    ws[currentCell].border = Border(bottom=self.__thick,right=self.__thick)
+
+        self.__startingRow += 6
+
+    def __characterLimit(self, strVal) -> str:
+        # If the character is too big, only display first and last name
+        if len(strVal) > 25:
+            return strVal.split()[0] + " "+ strVal.split()[-1]
+        else:
+            return strVal
+        
+    def __generateRandomColor(self) -> str:
+        # Generate random color for grouping modules
+        h,s,l = random.random()*360, random.random(), 0.9
+        r,g,b = [int(256*i) for i in colorsys.hls_to_rgb(h,l,s)]
+        hexVal = '{:02x}{:02x}{:02x}'.format(r, g, b)
+
+        return hexVal
+
+
+
 # ===== GUI Class =====
 class GUI(ttk.Window):
     def __init__(self):
         # Initialize Data Handler when program initialize
         self.__dataHandler = DataHandler()
+        self.__exportHandler = ExportHandler()
 
         # Make a window setting
         self.__initProgram() # Set all GUI components and features
@@ -753,7 +1061,7 @@ class GUI(ttk.Window):
         self.__backLoadButton = ttk.Button(self.__filterFrame, text="Back", bootstyle="primary",command=lambda:[self.__showPage(self.__loadPage)])
         self.__scheduleLabel = ttk.Label(self.__tableFrame, text="Schedules", font=titleFont)
         self.__resetSchedulesButton = ttk.Button(self.__filterFrame, text="Reset", style="reset.danger.Outline.TButton",command=lambda:[self.__showPage(self.__viewPage)])
-        self.__exportButton = ttk.Button(self.__filterFrame, text="Export", bootstyle="primary", command=lambda:[mb.show_error("You chose a folder with no CSV files\nPlease choose a folder with CSV files", "No Files Error")])
+        self.__exportButton = ttk.Button(self.__filterFrame, text="Export", bootstyle="primary", command=lambda:[self.__exportExcel()])
 
         # Setting filter options
         self.__moduleMenu = ttk.Menubutton(self.__filterFrame, style="new.primary.Outline.TMenubutton", text="Module")
@@ -1063,17 +1371,14 @@ class GUI(ttk.Window):
         folderPath = fd.askdirectory()
         filesList = []
         if folderPath != "":
-            try:
-                for file in os.listdir(folderPath):
-                    if file.endswith(".csv"):
-                        filesList.append(os.path.join(folderPath, file))
-                self.__dataHandler.setFilesPathList(filesList)
-                self.__displayFiles()
+            for file in os.listdir(folderPath):
+                if file.endswith(".csv"):
+                    filesList.append(os.path.join(folderPath, file))
+            self.__dataHandler.setFilesPathList(filesList)
+            self.__displayFiles()
 
-                if len(filesList) == 0:
-                    mb.show_error("You chose a folder with no CSV files\nPlease choose a folder with CSV files", "No Files Error")
-            except FileNotFoundError:
-                print("ERROR")
+            if len(filesList) == 0:
+                mb.show_error("You chose a folder with no CSV files\nPlease choose a folder with CSV files", "No Files Error")
 
     def __displayFiles(self):
         for i in self.__fileTree.get_children():
@@ -1139,6 +1444,19 @@ class GUI(ttk.Window):
                 mb.show_warning("No schedules to disply.", "No Files Warning")
             for i in self.__scheduleViewer.get_children():
                 self.__scheduleViewer.delete(i)
+
+    def __exportExcel(self):
+        if self.__displayHandler.getResult() == None:
+            mb.show_error("No schedules to export.\nPlease try again", "No schedule warning")
+        else:
+            try:
+                path = fd.askdirectory()
+                if path != "": 
+                    self.__exportHandler.setResult(self.__displayHandler.exportResult(),path)
+                    self.__exportHandler.exportExcel()
+                    mb.show_info("Export successfully done.", "Export Success")
+            except:
+                mb.show_error("Export failed!\nPlease try again.", "Export Failure")
 
     def __insertionSort(self,array) -> list:
         newList = []

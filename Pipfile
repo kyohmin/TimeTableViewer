@@ -7,6 +7,12 @@ name = "pypi"
 tk = "*"
 ttkbootstrap = "*"
 openpyxl = "*"
+pdf2image = "*"
+fpdf = "*"
+pyexcel = "*"
+pyexcel-ods = "*"
+"pyexcel.ods" = "*"
+pyexcel-ods3 = "*"
 
 [dev-packages]
 

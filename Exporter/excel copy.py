@@ -296,16 +296,31 @@ class ResultHandler:
         self.__reuslt = LinkedList()
         self.__startingRow = 12
         self.__weekCnt = 1
-        self.minDate = datetime.date(3000,1,1)
-        self.maxDate = datetime.date(1000,1,1)
-        self.groupedModules = {}
+        self.__minDate = datetime.date(3000,1,1)
+        self.__maxDate = datetime.date(1000,1,1)
+        self.__groupedModules = {}
+        self.__path = ""
+
     def setResult(self, result):
         self.__reuslt = result
+
+    def __resetData(self):
+        self.__reuslt = LinkedList()
+        self.__startingRow = 12
+        self.__weekCnt = 1
+        self.__minDate = datetime.date(3000,1,1)
+        self.__maxDate = datetime.date(1000,1,1)
+        self.__groupedModules = {}
+        self.__path = ""
+
     def exportExcel(self):
+        # Reset all data before exporting
+        self.__resetData()
+
         # Border width predefine
         self.__thick = Side(border_style="medium")
         self.__thin = Side(border_style="thin",color="808080")
-        self.getHeaderData()
+        self.__getHeaderData()
 
         wb = Workbook()
         ws = wb.active
@@ -320,16 +335,13 @@ class ResultHandler:
             ws.column_dimensions[i].width = 30
             col += 1
 
-        headFont = Font(bold = True, size=14)
-        headUnderFont = Font(bold = True, underline = "single", size=14)
-
-        # PSB
+        # PSB logo
         ws.merge_cells('B4:B7')
         ws['B4'].font = Font(size=76,color="902108",name='Times New Roman', bold=True)
         ws['B4'].alignment = Alignment(horizontal="center",vertical="center")
         ws['B4'] = "PSB"
 
-        # ACADEMY
+        # ACADEMY logo
         ws.row_dimensions[8].height = 20
         ws.row_dimensions[9].height = 20
         ws.merge_cells('B8:B9')
@@ -337,7 +349,7 @@ class ResultHandler:
         ws['B8'].alignment = Alignment(horizontal="center",vertical="center")
         ws['B8'] = "Academy"
 
-        # Module list header
+        # Grouped Module list header
         ws.merge_cells('D4:E4')
         ws['D4'].alignment = Alignment(horizontal="left",vertical="center")
         ws['D4'] = "Module"
@@ -359,9 +371,9 @@ class ResultHandler:
         ws['H4'].fill = PatternFill("solid", start_color="AACDFF")
         ws['I4'].fill = PatternFill("solid", start_color="AACDFF")
 
-        # Header Data Insert
+        # Grouped Module Data Insert
         i = 5
-        for _, value in self.groupedModules.items():
+        for _, value in self.__groupedModules.items():
             module, cohort, lecturer, fullPart = value[0], value[1], value[2], value[3]
             ws.merge_cells('D'+str(i)+':'+"E"+str(i))
             ws["D" + str(i)] = module
@@ -376,7 +388,7 @@ class ResultHandler:
             ws["G" + str(i)].border = Border(bottom=self.__thin,right=self.__thin)
             ws["H" + str(i)].border = Border(bottom=self.__thin,right=self.__thin)
             ws["I" + str(i)].border = Border(bottom=self.__thin,right=self.__thick)
-            if len(self.groupedModules.items())-1 == i-5:
+            if len(self.__groupedModules.items())-1 == i-5:
                 ws["D" + str(i)].border = Border(left=self.__thick,bottom=self.__thick)
                 ws["E" + str(i)].border = Border(bottom=self.__thick,right=self.__thin)
                 ws["F" + str(i)].border = Border(bottom=self.__thick,right=self.__thin)
@@ -386,79 +398,82 @@ class ResultHandler:
             ws.row_dimensions[i].height = 20
             i+=1
 
-        # Finding the Starting row
+        # Define the Starting row
         self.__startingRow = 12
-        if len(self.groupedModules.items()) > 5:
-            self.__startingRow += len(self.groupedModules.items())-4
+        if len(self.__groupedModules.items()) > 5:
+            self.__startingRow += len(self.__groupedModules.items())-4
 
-        # Main Schedule table
-
-        self.currentDate = self.minDate
+        # Build Main Schedule table
+        self.currentDate = self.__minDate
         self.weekStartMarked = False
-        self.createHeading(ws)
-        self.createRow(ws)
+        self.__createHeading(ws)
+        self.__createRow(ws)
         moduleRow = self.__startingRow
         createdRow = 1
         stream = 1
-        prevDate = self.minDate - datetime.timedelta(days=1)
+        prevDate = self.__minDate - datetime.timedelta(days=1)
+
+        # Insert schedules
         for schedule in self.__reuslt:
             date = schedule.data.get("activityDate")
+            # if new heading has to be created
             while date >= self.currentDate:
                 date = schedule.data.get("activityDate")
-                self.createHeading(ws)
-                self.createRow(ws)
+                self.__createHeading(ws)
+                self.__createRow(ws)
                 moduleRow = self.__startingRow
                 createdRow = 1
                 stream = 1
 
+            # if the schedule is the first to go in the date
             if date != prevDate:
                 stream = 1
                 insertingCell = get_column_letter(date.isoweekday()+2) + str(moduleRow - 6)
                 ws[insertingCell] = schedule.data.get("moduleCode") + " (" + schedule.data.get("fullPart")+")"
-                ws[insertingCell].fill = PatternFill("solid", start_color=self.groupedModules[f"{schedule.data.get('module')}{schedule.data.get('cohort')}{schedule.data.get('lecturer')}{schedule.data.get('fullPart')}"][4])
+                ws[insertingCell].fill = PatternFill("solid", start_color=self.__groupedModules[f"{schedule.data.get('module')}{schedule.data.get('cohort')}{schedule.data.get('lecturer')}{schedule.data.get('fullPart')}"][4])
                 ws[get_column_letter(date.isoweekday()+2) + str(moduleRow - 5)] = str(schedule.data.get("startTime"))[:-3] + " ~ " + str(schedule.data.get("endTime"))[:-3]
-                ws[get_column_letter(date.isoweekday()+2) + str(moduleRow - 4)] = self.characterLimit(schedule.data.get("lecturer"))
+                ws[get_column_letter(date.isoweekday()+2) + str(moduleRow - 4)] = self.__characterLimit(schedule.data.get("lecturer"))
                 ws[get_column_letter(date.isoweekday()+2) + str(moduleRow - 3)] = schedule.data.get("location")
                 ws[get_column_letter(date.isoweekday()+2) + str(moduleRow - 2)] = schedule.data.get("size")
                 ws[get_column_letter(date.isoweekday()+2) + str(moduleRow - 1)] = schedule.data.get("zone")
-                
+            
+            # If the schedule has to go to second ~ # rows
             else:
                 stream += 1
+                # If I need to create a new row for new data
                 if createdRow < stream:
-                    self.createRow(ws)
+                    self.__createRow(ws)
                     createdRow += 1
+                # Insert schedule
                 insertingCell = get_column_letter(date.isoweekday()+2) + str(moduleRow - 12 + (stream*6))
                 ws[insertingCell] = schedule.data.get("moduleCode") + " (" + schedule.data.get("fullPart")+")"
-                ws[insertingCell].fill = PatternFill("solid", start_color=self.groupedModules[f"{schedule.data.get('module')}{schedule.data.get('cohort')}{schedule.data.get('lecturer')}{schedule.data.get('fullPart')}"][4])
+                ws[insertingCell].fill = PatternFill("solid", start_color=self.__groupedModules[f"{schedule.data.get('module')}{schedule.data.get('cohort')}{schedule.data.get('lecturer')}{schedule.data.get('fullPart')}"][4])
                 ws[get_column_letter(date.isoweekday()+2) + str(moduleRow - 12 + (stream*6)+1)] = str(schedule.data.get("startTime"))[:-3] + " ~ " + str(schedule.data.get("endTime"))[:-3]
-                ws[get_column_letter(date.isoweekday()+2) + str(moduleRow - 12 + (stream*6)+2)] = self.characterLimit(schedule.data.get("lecturer"))
+                ws[get_column_letter(date.isoweekday()+2) + str(moduleRow - 12 + (stream*6)+2)] = self.__characterLimit(schedule.data.get("lecturer"))
                 ws[get_column_letter(date.isoweekday()+2) + str(moduleRow - 12 + (stream*6)+3)] = schedule.data.get("location")
                 ws[get_column_letter(date.isoweekday()+2) + str(moduleRow - 12 + (stream*6)+4)] = schedule.data.get("size")
                 ws[get_column_letter(date.isoweekday()+2) + str(moduleRow - 12 + (stream*6)+5)] = schedule.data.get("zone")
             prevDate = date
 
-            
-            
-        ####+++++++++++++++==============================================
-        
 
-        ####+++++++++++++++==============================================
+        # Remove the frid lines and headers in Excel for clean view
         ws.sheet_view.showGridLines = False
         ws.sheet_view.showRowColHeaders = False
 
-        wb.save("Hello4.xlsx")
+        wb.save(self.__path+"Excel_Timetable.xlsx")
 
-    def getHeaderData(self):
+    def __getHeaderData(self): # Used for finding the grouped schedules
         groupingSchedule = {}
         for i in self.__reuslt:
             strVal = f"{i.data.get('module')}{i.data.get('cohort')}{i.data.get('lecturer')}{i.data.get('fullPart')}"
-            groupingSchedule.update({strVal:[i.data.get('module')+' '+i.data.get('moduleCode'),i.data.get('cohort'),i.data.get('lecturer'),i.data.get('fullPart'),self.generateRandomColor()]})
-            if i.data.get("activityDate") < self.minDate: self.minDate = i.data.get("activityDate")
-            if i.data.get("activityDate") > self.maxDate: self.maxDate = i.data.get("activityDate")
+            groupingSchedule.update({strVal:[i.data.get('module')+' '+i.data.get('moduleCode'),i.data.get('cohort'),i.data.get('lecturer'),i.data.get('fullPart'),self.__generateRandomColor()]})
+            if i.data.get("activityDate") < self.__minDate: self.__minDate = i.data.get("activityDate")
+            if i.data.get("activityDate") > self.__maxDate: self.__maxDate = i.data.get("activityDate")
 
-        self.groupedModules = groupingSchedule
+        self.__groupedModules = groupingSchedule
     
-    def createHeading(self, ws):
+    def __createHeading(self, ws): # Used for creating heading with days and dates
+        # 
         headingFont = Font(size=14, bold=True, underline="single")
         days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
         for i in range(8):
@@ -466,14 +481,14 @@ class ResultHandler:
             currentCell = currentColumnLetter + str(self.__startingRow)
             bottomCell = currentColumnLetter + str(self.__startingRow+1)
             
-            # For the Week
+            # For the Week columns
             if currentColumnLetter == "B":
                 ws.merge_cells('B' + str(self.__startingRow)+':'+'B'+ str(self.__startingRow+1))
                 ws[currentCell] = "Week" + str(self.__weekCnt)
                 ws[currentCell].border = Border(left=self.__thick, top=self.__thick,right=self.__thick)
                 ws[bottomCell].border = Border(left=self.__thick, bottom=self.__thick, right=self.__thick)
 
-            # For the Days and date
+            # For the Days and date columns
             else:
                 currentCell = currentColumnLetter + str(self.__startingRow)
                 ws[currentCell] = days[i-1]
@@ -500,7 +515,6 @@ class ResultHandler:
                 if self.currentDate.isoweekday() == i+1:
                     ws[currentCell] = self.currentDate
                     self.weekStartMarked = True
-                print(str(self.currentDate.isoweekday()) + "--" + str(i+1))
                 
             # If start has marked
             else:
@@ -512,10 +526,10 @@ class ResultHandler:
         self.__weekCnt += 1
         self.__startingRow += 2
 
-    def createRow(self,ws):
+    def __createRow(self,ws): # Used for creating empty schedules row frame
         detailList = ["Module", "Time", "Lecturer", "Location", "Size", "Zone"]
         ws.row_dimensions[self.__startingRow].height = 70
-        # Left Column
+        # Left Column border and data setting
         for i in range(6):
             currentCell = "B" + str(i + self.__startingRow)
             ws[currentCell] = detailList[i]
@@ -526,7 +540,7 @@ class ResultHandler:
 
         ws["B" + str(5 + self.__startingRow)].border = Border(bottom=self.__thick,right=self.__thick,left=self.__thick)
 
-        # Setting the font for the actual values
+        # Setting the font and border for the actual values
         for i in range(7):
             for j in range(6):
                 currentColumnLetter = get_column_letter(i+3)
@@ -543,18 +557,18 @@ class ResultHandler:
 
         self.__startingRow += 6
 
-    def characterLimit(self, strVal):
+    def __characterLimit(self, strVal) -> str:
+        # If the character is too big, only display first and last name
         if len(strVal) > 25:
             return strVal.split()[0] + " "+ strVal.split()[-1]
         else:
             return strVal
         
-    def generateRandomColor(self):
-        h,s,l = random.random()*360, 0.5, 0.9
+    def __generateRandomColor(self) -> str:
+        # Generate random color for grouping modules
+        h,s,l = random.random()*360, random.random(), 0.9
         r,g,b = [int(256*i) for i in colorsys.hls_to_rgb(h,l,s)]
         hexVal = '{:02x}{:02x}{:02x}'.format(r, g, b)
-
-        print(hexVal)
 
         return hexVal
     
