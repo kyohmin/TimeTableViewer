@@ -579,9 +579,6 @@ class ExportHandler:
         self.__path = path
 
     def exportExcel(self):
-        # Reset all data before exporting
-        # self.__resetData()
-
         # Reset values for repeated process
         self.__startingRow = 12
         self.__weekCnt = 1
@@ -652,6 +649,7 @@ class ExportHandler:
             ws["F" + str(i)] = cohort
             ws["G" + str(i)] = lecturer
             ws["H" + str(i)] = fullPart
+            ws["I" + str(i)] = str(value[5]) + " - " + str(value[6])
             ws["D" + str(i)].fill = PatternFill("solid", start_color=value[4])
 
             ws["D" + str(i)].border = Border(left=self.__thick,bottom=self.__thin)
@@ -738,7 +736,23 @@ class ExportHandler:
         groupingSchedule = {}
         for i in self.__result:
             strVal = f"{i.data.get('module')}{i.data.get('cohort')}{i.data.get('lecturer')}{i.data.get('fullPart')}"
-            groupingSchedule.update({strVal:[i.data.get('module')+' '+i.data.get('moduleCode'),i.data.get('cohort'),i.data.get('lecturer'),i.data.get('fullPart'),self.__generateRandomColor()]})
+            # If the schedule is first time recording
+            if strVal not in groupingSchedule:
+                minDate, maxDate = i.data.get("activityDate"), i.data.get("activityDate")
+                groupingSchedule[strVal] = [i.data.get('module')+' '+i.data.get('moduleCode'),i.data.get('cohort'),i.data.get('lecturer'),i.data.get('fullPart'),self.__generateRandomColor(), minDate, maxDate]
+
+            # If it has been recorded
+            else:
+                minDate = groupingSchedule[strVal][5]
+                maxDate = groupingSchedule[strVal][6]
+                # Finding the starting and ending date of each group
+                if minDate > i.data.get("activityDate"):
+                    minDate = i.data.get("activityDate")
+                if maxDate < i.data.get("activityDate"):
+                    maxDate = i.data.get("activityDate")
+
+                groupingSchedule.update({strVal:[i.data.get('module')+' '+i.data.get('moduleCode'),i.data.get('cohort'),i.data.get('lecturer'),i.data.get('fullPart'),self.__generateRandomColor(), minDate, maxDate]})
+
             if i.data.get("activityDate") < self.__minDate: self.__minDate = i.data.get("activityDate")
             if i.data.get("activityDate") > self.__maxDate: self.__maxDate = i.data.get("activityDate")
 
