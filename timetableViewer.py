@@ -13,9 +13,11 @@ import datetime # For date and time in the schedule
 # Export Handler Class
 import random # For random color generator
 import colorsys # For erandom color generator
+from fpdf import FPDF # For editting pdf
 from openpyxl import Workbook # For editting Excel
 from openpyxl.utils import get_column_letter # # For changing index number to column letter
 from openpyxl.styles import Font, Alignment, Border, Side, PatternFill # For editting components of Excel
+
 
 """
 Module Download Requirements:
@@ -65,6 +67,15 @@ class LinkedList:
         else:
             self.tail.next = newNode
             self.tail= newNode
+
+    def pop(self):
+        if self.head != None:
+            tmp = self.head
+            self.head = self.head.next
+            if self.head == None: self.tail = None
+            return tmp.data
+        else:
+            return None
 
 class HashNode: # Used for Hash table
     def __init__(self, key = -1):
@@ -567,12 +578,8 @@ class DisplayHandler:
 class ExportHandler:
     def __init__(self):
         self.__result = LinkedList()
-        self.__startingRow = 12
-        self.__weekCnt = 1
-        self.__minDate = datetime.date(3000,1,1)
-        self.__maxDate = datetime.date(1000,1,1)
-        self.__groupedModules = {}
         self.__path = ""
+        self.__groupedModules = {}
 
     def setResult(self, result:LinkedList, path:str):
         self.__result = result
@@ -676,8 +683,8 @@ class ExportHandler:
         # Build Main Schedule table
         self.currentDate = self.__minDate
         self.weekStartMarked = False
-        self.__createHeading(ws)
-        self.__createRow(ws)
+        self.__createExcelHeading(ws)
+        self.__createExcelRow(ws)
         moduleRow = self.__startingRow
         createdRow = 1
         stream = 1
@@ -689,8 +696,8 @@ class ExportHandler:
             # if new heading has to be created
             while date >= self.currentDate:
                 date = schedule.data.get("activityDate")
-                self.__createHeading(ws)
-                self.__createRow(ws)
+                self.__createExcelHeading(ws)
+                self.__createExcelRow(ws)
                 moduleRow = self.__startingRow
                 createdRow = 1
                 stream = 1
@@ -712,7 +719,7 @@ class ExportHandler:
                 stream += 1
                 # If I need to create a new row for new data
                 if createdRow < stream:
-                    self.__createRow(ws)
+                    self.__createExcelRow(ws)
                     createdRow += 1
                 # Insert schedule
                 insertingCell = get_column_letter(date.isoweekday()+2) + str(moduleRow - 12 + (stream*6))
@@ -732,14 +739,70 @@ class ExportHandler:
 
         wb.save(self.__path+"/Excel_Timetable.xlsx")
 
-    def __getHeaderData(self): # Used for finding the grouped schedules
+    def exportPDF(self):
+        self.__weekStartMarked = False
+        self.__weekCnt = 1
+        self.__minDate = datetime.date(3000,1,1)
+        self.__maxDate = datetime.date(1000,1,1)
+        self.__groupedModules = {}
+
+        pdf =  FPDF('L','mm',(500,300))
+        pdf.add_page()
+
+        # PSB Logo
+        pdf.set_font("times","B",30)
+        pdf.set_text_color(158,36,36)
+        pdf.cell(33,8,"PSB",ln=True,border=0,align="C")
+
+        # Academy Logo
+        pdf.set_font("helvetica","B",12)
+        pdf.set_text_color(156,156,156)
+        pdf.cell(33,5,"Academy",border=0,ln=True,align="C")
+        pdf.cell(33,5,"",ln=True)
+
+        # Table header for grouped modules
+        pdf.set_font("helvetica", "B", 7)
+        pdf.set_text_color(0,0,0)
+        pdf.set_fill_color(170, 205, 255)
+        pdf.cell(60,5,"Module", border=True, fill=True)
+        pdf.cell(20,5,"Cohort", border=True, fill=True)
+        pdf.cell(50,5,"Lecturer", border=True, fill=True)
+        pdf.cell(30,5,"Full-time/Part-time", border=True, fill=True)
+        pdf.cell(30,5,"Date Start - Date End", border=True, fill=True, ln=True)
+
+        # Table for grouped modules
+        self.__getHeaderData(False)
+        self.__currentDate = self.__minDate
+        pdf.set_font("helvetica", "", 7)
+        pdf.set_text_color(0,0,0)
+        for i, value in self.__groupedModules.items():
+            pdf.set_fill_color(value[4][0],value[4][1],value[4][2])
+            pdf.cell(60,5,f"{value[0]}",border=True, fill=True)
+            pdf.cell(20,5,f"{value[1]}",border=True, fill=True)
+            pdf.cell(50,5,f"{value[2]}",border=True, fill=True)
+            pdf.cell(30,5,f"{value[3]}",border=True, fill=True)
+            pdf.cell(30,5,f"{value[5]} - {value[6]}",border=True, fill=True, ln=True)
+
+        pdf.cell(30,5,"", ln=True)
+
+        # Header for Schedules table
+        while self.__currentDate < self.__maxDate:
+            self.__createPDFHeading(pdf)
+            self.__createPDFRow(pdf)
+
+        pdf.output(self.__path+"/PDF_Timetable.pdf")
+
+    def __getHeaderData(self, isExcel = True): # Used for finding the grouped schedules
+        if isExcel == True: colorVar = "hex"
+        else: colorVar = "rgb"
+
         groupingSchedule = {}
         for i in self.__result:
             strVal = f"{i.data.get('module')}{i.data.get('cohort')}{i.data.get('lecturer')}{i.data.get('fullPart')}"
             # If the schedule is first time recording
             if strVal not in groupingSchedule:
                 minDate, maxDate = i.data.get("activityDate"), i.data.get("activityDate")
-                groupingSchedule[strVal] = [i.data.get('module')+' '+i.data.get('moduleCode'),i.data.get('cohort'),i.data.get('lecturer'),i.data.get('fullPart'),self.__generateRandomColor(), minDate, maxDate]
+                groupingSchedule[strVal] = [i.data.get('module')+' '+i.data.get('moduleCode'),i.data.get('cohort'),i.data.get('lecturer'),i.data.get('fullPart'),self.__generateRandomColor(colorVar), minDate, maxDate]
 
             # If it has been recorded
             else:
@@ -751,14 +814,14 @@ class ExportHandler:
                 if maxDate < i.data.get("activityDate"):
                     maxDate = i.data.get("activityDate")
 
-                groupingSchedule.update({strVal:[i.data.get('module')+' '+i.data.get('moduleCode'),i.data.get('cohort'),i.data.get('lecturer'),i.data.get('fullPart'),self.__generateRandomColor(), minDate, maxDate]})
+                groupingSchedule.update({strVal:[i.data.get('module')+' '+i.data.get('moduleCode'),i.data.get('cohort'),i.data.get('lecturer'),i.data.get('fullPart'),self.__generateRandomColor(colorVar), minDate, maxDate]})
 
             if i.data.get("activityDate") < self.__minDate: self.__minDate = i.data.get("activityDate")
             if i.data.get("activityDate") > self.__maxDate: self.__maxDate = i.data.get("activityDate")
 
         self.__groupedModules = groupingSchedule
     
-    def __createHeading(self, ws): # Used for creating heading with days and dates
+    def __createExcelHeading(self, ws): # Used for creating heading with days and dates
         # 
         headingFont = Font(size=14, bold=True, underline="single")
         days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
@@ -812,7 +875,7 @@ class ExportHandler:
         self.__weekCnt += 1
         self.__startingRow += 2
 
-    def __createRow(self,ws): # Used for creating empty schedules row frame
+    def __createExcelRow(self,ws): # Used for creating empty schedules row frame
         detailList = ["Module", "Time", "Lecturer", "Location", "Size", "Zone"]
         ws.row_dimensions[self.__startingRow].height = 70
         # Left Column border and data setting
@@ -843,6 +906,177 @@ class ExportHandler:
 
         self.__startingRow += 6
 
+    def __createPDFHeading(self, pdf):
+        pdf.set_font("helvetica", "B", 7)
+        pdf.set_fill_color(170, 205, 255)
+        pdf.cell(30,10, f"Week{self.__weekCnt}", border=True, fill=True, align="C")
+        pdf.cell(35,5, "Monday", border=True, fill=True, align="C")
+        pdf.cell(35,5, "Tuesday", border=True, fill=True, align="C")
+        pdf.cell(35,5, "Wednesday", border=True, fill=True, align="C")
+        pdf.cell(35,5, "Thursday", border=True, fill=True, align="C")
+        pdf.cell(35,5, "Friday", border=True, fill=True, align="C")
+        pdf.cell(35,5, "Saturday", border=True, fill=True, align="C")
+        pdf.cell(35,5, "Sunday", border=True, fill=True, align="C", ln=True)
+        pdf.cell(30,5, "", border=False,fill=False)
+        
+        # Adding date in the cell
+        for i in range(7):
+            pdf.set_font("helvetica", "", 7)
+            if self.__weekCnt == 1 and not self.__weekStartMarked:
+                if self.__currentDate.isoweekday() == i+1 and i == 6:
+                    pdf.cell(35,5,f"{self.__currentDate}",fill=True, border=True, ln=True, align="C")
+                    self.__weekStartMarked = True
+                elif self.__currentDate.isoweekday() == i+1:
+                    pdf.cell(35,5,f"{self.__currentDate}",fill=True,border=True, align="C")
+                    self.__weekStartMarked = True
+                else:
+                    pdf.cell(35,5,"",fill=True,border=True)
+            else:
+                if i == 6:
+                    pdf.cell(35,5,f"{self.__currentDate}",fill=True,border=True, align="C", ln=True)
+                else:    
+                    pdf.cell(35,5,f"{self.__currentDate}",fill=True,border=True, align="C")
+
+            if self.__weekStartMarked == True:
+                self.__currentDate += datetime.timedelta(days=1)
+        
+        self.__weekCnt += 1
+        
+    def __createPDFRow(self, pdf, commonSchedules = LinkedList(), common = False):
+        pdf.set_font("helvetica", "B", 7)
+        # Module row schedule input
+        pdf.set_fill_color(222, 235, 255)
+        pdf.cell(30,25,"Module", fill=True, border = True, align = "C")
+        currentWeekSchedules = LinkedList()
+
+
+        # Adding the current schedule
+
+        if common == False:
+            for schedule in self.__result:
+                if schedule.data.get("activityDate") < self.__currentDate:
+                    currentWeekSchedules.append(schedule.data)
+                else:
+                    break
+        else:
+            currentWeekSchedules = commonSchedules
+            commonSchedules= LinkedList()
+
+        otherData = LinkedList()
+
+        prev = self.__currentDate
+        if currentWeekSchedules.head == None:
+            for i in range(7):
+                pdf.set_fill_color(255, 255, 255)
+                if i == 6:
+                    pdf.cell(35,25,f"", fill=True, border = True, align = "C", ln=True)
+                else:
+                    pdf.cell(35,25,f"", fill=True, border = True, align = "C")
+        else:
+            for i in range(7):
+                # For Module
+                if currentWeekSchedules.head != None:
+                    if prev != currentWeekSchedules.head.data.get("activityDate"):
+                        if currentWeekSchedules.head.data.get("activityDate").isoweekday() == i+1:
+                            prev = currentWeekSchedules.head.data.get("activityDate")
+                            r,g,b = self.__groupedModules[f"{currentWeekSchedules.head.data.get('module')}{currentWeekSchedules.head.data.get('cohort')}{currentWeekSchedules.head.data.get('lecturer')}{currentWeekSchedules.head.data.get('fullPart')}"][4]
+                            pdf.set_fill_color(r,g,b)
+                            otherData.append(currentWeekSchedules.head.data)
+                            if i == 6:
+                                pdf.cell(35,25,f"{currentWeekSchedules.pop().get('moduleCode')}", fill=True, border=True, align="C", ln=True)
+                            else:
+                                pdf.cell(35,25,f"{currentWeekSchedules.pop().get('moduleCode')}", fill=True, border=True, align="C")
+
+                            while currentWeekSchedules.head != None and prev == currentWeekSchedules.head.data.get("activityDate"):
+                                commonSchedules.append(currentWeekSchedules.head.data)
+                                currentWeekSchedules.pop()
+                        else:
+                            pdf.cell(35,25,f"", border = True, align = "C")
+
+                elif currentWeekSchedules.head == None:
+                    pdf.set_fill_color(255, 255, 255)
+                    if i == 6: pdf.cell(35,25,"", border = True, align = "C", ln=True)
+                    else: pdf.cell(35,25,"", border = True, align = "C")
+
+
+        pdf.set_fill_color(222, 235, 255)
+        pdf.cell(30,5,"Time", fill=True, border = True, align = "C")
+        self.__createOtherPDFData(pdf,otherData,"time")
+        pdf.set_fill_color(222, 235, 255)
+        pdf.cell(30,5,"Lecturer", fill=True, border = True, align = "C")
+        self.__createOtherPDFData(pdf,otherData,"lecturer")
+        pdf.set_fill_color(222, 235, 255)
+        pdf.cell(30,5,"Location", fill=True, border = True, align = "C")
+        self.__createOtherPDFData(pdf,otherData,"location")
+        pdf.set_fill_color(222, 235, 255)
+        pdf.cell(30,5,"Size", fill=True, border = True, align = "C")
+        self.__createOtherPDFData(pdf,otherData,"size")
+        pdf.set_fill_color(222, 235, 255)
+        pdf.cell(30,5,"Zone", fill=True, border = True, align = "C")
+        self.__createOtherPDFData(pdf,otherData,"zone")
+        
+        if commonSchedules.head == None:
+            for i in self.__result:
+                if i.data.get("activityDate") >= self.__currentDate:
+                    self.__result = i
+                    break
+        else:
+            self.__createPDFRow(pdf,commonSchedules,True)
+
+    def __createOtherPDFData(self,pdf,otherData, category):
+        prev = self.__currentDate
+        copiedData = LinkedList()
+        for i in otherData:
+            copiedData.append(i.data)
+
+        if copiedData.head == None:
+            for i in range(7):
+                pdf.set_fill_color(255, 255, 255)
+                if i == 6:
+                    pdf.cell(35,5,f"", fill=True, border = True, align = "C", ln=True)
+                else:    
+                    pdf.cell(35,5,f"", fill=True, border = True, align = "C")
+        else:
+            for i in range(7):
+                # For Module
+                if copiedData.head != None:
+                    if prev != copiedData.head.data.get("activityDate"):
+                        if copiedData.head.data.get("activityDate").isoweekday() == i+1:
+                            prev = copiedData.head.data.get("activityDate")
+
+                            if i == 6:
+                                if category == "time":
+                                    pdf.cell(35,5,f"{copiedData.head.data.get('startTime')} ~ {copiedData.head.data.get('endTime')}", border=True, align="C", ln=True)
+                                    copiedData.pop()
+                                else:
+                                    pdf.cell(35,5,f"{self.__characterLimit(str(copiedData.pop().get(category)))}", border=True, align="C", ln=True)
+                            else:
+                                if category == "time":
+                                    pdf.cell(35,5,f"{copiedData.head.data.get('startTime')} ~ {copiedData.head.data.get('endTime')}", border=True, align="C")
+                                    copiedData.pop()
+                                else:
+                                    pdf.cell(35,5,f"{self.__characterLimit(str(copiedData.pop().get(category)))}", border=True, align="C")
+
+                            while copiedData.head != None and prev == copiedData.head.data.get("activityDate"):
+                                copiedData.pop()
+                        else:
+                            # After End
+                            if i == 6:
+                                pdf.cell(35,5,f"", border = True, align = "C",ln=True)
+                            else:
+                                pdf.cell(35,5,f"", border = True, align = "C")
+
+                elif copiedData.head == None:
+                    if i == 6: pdf.cell(35,5,"", border = True, align = "C", ln=True)
+                    else: pdf.cell(35,5,"", border = True, align = "C")
+
+    def __characterLimit(self, strVal) -> str:
+        # If the character is too big, only display first and last name
+        if len(strVal) > 25:
+            return strVal.split()[0] + " "+ strVal.split()[-1]
+        else:
+            return strVal
+
     def __characterLimit(self, strVal) -> str:
         # If the character is too big, only display first and last name
         if len(strVal) > 25:
@@ -850,13 +1084,17 @@ class ExportHandler:
         else:
             return strVal
         
-    def __generateRandomColor(self) -> str:
+    def __generateRandomColor(self, resultType="hex"):
         # Generate random color for grouping modules
         h,s,l = random.random()*360, random.random(), 0.9
         r,g,b = [int(256*i) for i in colorsys.hls_to_rgb(h,l,s)]
-        hexVal = '{:02x}{:02x}{:02x}'.format(r, g, b)
-
-        return hexVal
+        
+        if resultType == "hex":
+            result = '{:02x}{:02x}{:02x}'.format(r, g, b)
+        elif resultType == "rgb":
+            result = [int(r),int(g),int(b)]
+            
+        return result
 
 
 
@@ -1066,8 +1304,8 @@ class GUI(ttk.Window):
         # Setting components
         self.__startDate = ttk.DateEntry(self.__filterFrame, width=8, dateformat="%d-%m-%Y")
         self.__endDate = ttk.DateEntry(self.__filterFrame, width=8, dateformat="%d-%m-%Y")
-        self.__applyDateButton = ttk.Button(self.__filterFrame, text="Apply Date", bootstyle="primary-Outline",command=lambda:[self.__queryFilterDateTime("date",self.__startDate.entry.get(),self.__endDate.entry.get())])
-        self.__applyTimeButton = ttk.Button(self.__filterFrame, text="Apply Time", bootstyle="primary-Outline",command=lambda:[self.__queryFilterDateTime("time",self.__startTimeEntry.get(),self.__endTimeEntry.get())])
+        self.__applyDateButton = ttk.Button(self.__filterFrame, text="Apply Date", bootstyle="primary",command=lambda:[self.__queryFilterDateTime("date",self.__startDate.entry.get(),self.__endDate.entry.get())])
+        self.__applyTimeButton = ttk.Button(self.__filterFrame, text="Apply Time", bootstyle="primary",command=lambda:[self.__queryFilterDateTime("time",self.__startTimeEntry.get(),self.__endTimeEntry.get())])
         self.__startTimeEntry = ttk.Entry(self.__filterFrame, width=13)
         self.__startTimeEntry.insert(0,"01:00")
         self.__endTimeEntry = ttk.Entry(self.__filterFrame, width=13)
@@ -1075,7 +1313,13 @@ class GUI(ttk.Window):
         self.__backLoadButton = ttk.Button(self.__filterFrame, text="Back", bootstyle="primary",command=lambda:[self.__showPage(self.__loadPage)])
         self.__scheduleLabel = ttk.Label(self.__tableFrame, text="Schedules", font=titleFont)
         self.__resetSchedulesButton = ttk.Button(self.__filterFrame, text="Reset", style="reset.danger.Outline.TButton",command=lambda:[self.__showPage(self.__viewPage)])
-        self.__exportButton = ttk.Button(self.__filterFrame, text="Export", bootstyle="primary", command=lambda:[self.__exportExcel()])
+
+        # Export Menu button
+        self.__exportMenu = ttk.Menubutton(self.__filterFrame, style="primary.Outline.TMenubutton", text="Export")
+        exportOptions = ttk.Menu(self.__exportMenu)
+        exportOptions.add_radiobutton(label="Excel", command=lambda:[self.__exportExcel()])
+        exportOptions.add_radiobutton(label="PDF", command=lambda:[self.__exportPDF()])
+        self.__exportMenu['menu'] = exportOptions
 
         # Setting filter options
         self.__moduleMenu = ttk.Menubutton(self.__filterFrame, style="new.primary.Outline.TMenubutton", text="Module")
@@ -1120,7 +1364,7 @@ class GUI(ttk.Window):
         self.__applyTimeButton.grid(row=8,column=2)
         self.__backLoadButton.grid(row=9, column=0, sticky="s", pady=(0,10), padx=(0,0), ipadx=20, ipady=5)
         self.__resetSchedulesButton.grid(row=9, column=1, sticky="s", pady=(0,15), padx=40, ipadx=20, ipady=1)
-        self.__exportButton.grid(row=9,column=2,stick="s", pady=(0,10), padx=(0,0), ipadx=20, ipady=5)
+        self.__exportMenu.grid(row=9,column=2,stick="wes", pady=(0,10), padx=30, ipadx=10, ipady=5)
         self.__moduleMenu.grid(row=1,column=0,sticky="we",padx=10)
         self.__moduleCodeMenu.grid(row=1,column=1,sticky="we",padx=10)
         self.__cohortMenu.grid(row=1,column=2,sticky="we",padx=10)
@@ -1468,6 +1712,19 @@ class GUI(ttk.Window):
                 if path != "": 
                     self.__exportHandler.setResult(self.__displayHandler.exportResult(),path)
                     self.__exportHandler.exportExcel()
+                    mb.show_info("Export successfully done.", "Export Success")
+            except:
+                mb.show_error("Export failed!\nPlease try again.", "Export Failure")
+
+    def __exportPDF(self):
+        if self.__displayHandler.getResult() == None:
+            mb.show_error("No schedules to export.\nPlease try again", "No schedule warning")
+        else:
+            try:
+                path = fd.askdirectory()
+                if path != "":
+                    self.__exportHandler.setResult(self.__displayHandler.exportResult(),path)
+                    self.__exportHandler.exportPDF()
                     mb.show_info("Export successfully done.", "Export Success")
             except:
                 mb.show_error("Export failed!\nPlease try again.", "Export Failure")
