@@ -24,6 +24,7 @@ Module Download Requirements:
     1. tkinter
     2. ttkbootstrap
     3. openpyxl
+    4. fpdf
 """
 
 
@@ -438,24 +439,29 @@ class DisplayHandler:
         if category == "time": # For Time - O(n)
             self.sort("startTime")
             head = None
+            endExit = False
             for i in self.__sortedSchedules:
                 if i.data.get("startTime") >= start: # First schedule found
+                    if i.data.get("startTime") > end:
+                        endExit = True
+                        break
                     head = i
                     break
 
-            self.setCommonSchedules(head)
-            self.sort("endTime")
-            try:
-                tail = self.__sortedSchedules
-                tail = None
-                for i in self.__sortedSchedules:
-                    if i.data.get("endTime") > end: # Last schedule found
-                        if tail is not None:
-                            tail.next = None
-                        break
-                    tail = i
-            except:
-                pass
+            if endExit == False:
+                self.setCommonSchedules(head)
+                self.sort("endTime")
+                try:
+                    tail = self.__sortedSchedules
+                    for i in self.__sortedSchedules:
+                        if i.data.get("endTime") > end: # Last schedule found
+                            if tail is not None:
+                                tail.next = None
+                                if tail == self.__sortedSchedules: self.__sortedSchedules = None
+                            break
+                        tail = i
+                except:
+                    pass
 
         else: # For Date - O(n)
             self.sort(category)
@@ -1069,13 +1075,6 @@ class ExportHandler:
                 elif copiedData.head == None:
                     if i == 6: pdf.cell(35,5,"", border = True, align = "C", ln=True)
                     else: pdf.cell(35,5,"", border = True, align = "C")
-
-    def __characterLimit(self, strVal) -> str:
-        # If the character is too big, only display first and last name
-        if len(strVal) > 25:
-            return strVal.split()[0] + " "+ strVal.split()[-1]
-        else:
-            return strVal
 
     def __characterLimit(self, strVal) -> str:
         # If the character is too big, only display first and last name
